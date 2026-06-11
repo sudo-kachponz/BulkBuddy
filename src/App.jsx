@@ -96,11 +96,142 @@ export default function App() {
     setIsTyping(false)
   }, [])
 
+  /* ── Stream Agent Invoke ── */
+  const streamAgentInvoke = async (promptText, actionType = 'chat') => {
+    setIsTyping(true)
+    let aiMessageIndex = -1
+
+    try {
+      const response = await fetch("http://localhost:8000/agent-invoke/fff649af-1f16-4027-9371-76a4d587096b/invoke-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: {
+            messages: promptText,
+            context: "",
+            image_path: null
+          },
+          config: {
+            configurable: {
+              thread_id: "1"
+            }
+          },
+          metadata: {
+            model_name: "anthropic/claude-3.5-sonnet",
+            reset_memory: false,
+            load_from_json: true,
+            agent_style: ""
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder("utf-8")
+      let buffer = ""
+      let aiText = ""
+      let currentEvent = ""
+
+      setMessages(prev => {
+        const newMessages = [...prev, { role: 'ai', text: 'Menghubungkan ke Agent...' }]
+        aiMessageIndex = newMessages.length - 1
+        return newMessages
+      })
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (!line) continue
+
+          if (line.startsWith("event:")) {
+            currentEvent = line.replace("event:", "").trim()
+          } else if (line.startsWith("data:")) {
+            const rawData = line.replace("data:", "").trim()
+            try {
+              const data = JSON.parse(rawData)
+              if (currentEvent === "token") {
+                aiText += data.token
+                setMessages(prev => {
+                  const updated = [...prev]
+                  if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                    updated[aiMessageIndex].text = aiText
+                  }
+                  return updated
+                })
+              } else if (currentEvent === "status") {
+                if (data.status && data.status !== "Agent Execution End") {
+                  setMessages(prev => {
+                    const updated = [...prev]
+                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                      updated[aiMessageIndex].text = `⏱️ Status: ${data.status}...\n\n${aiText}`
+                    }
+                    return updated
+                  })
+                }
+              } else if (currentEvent === "tool_status") {
+                const statusSymbol = data.is_start ? "🛠️" : "✅"
+                setMessages(prev => {
+                  const updated = [...prev]
+                  if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                    updated[aiMessageIndex].text = `⏱️ ${statusSymbol} Tool [${data.tool_name}]: ${data.status}\n\n${aiText}`
+                  }
+                  return updated
+                })
+              }
+            } catch (e) {
+              console.error("Failed to parse SSE data JSON:", rawData, e)
+            }
+          }
+        }
+      }
+
+      // Post-stream actions
+      if (actionType === 'Kirim ke CTO') {
+        showToast('📧 Email berhasil dikirim ke CTO!', 'info')
+      } else if (actionType === 'Simpan ke Sheets') {
+        showToast('📊 Data berhasil disimpan ke Google Sheets!', 'success')
+      } else {
+        showToast('AI selesai memproses permintaan', 'success')
+      }
+
+    } catch (error) {
+      console.error("Error invoking agent:", error)
+      showToast("Gagal berkomunikasi dengan Agent", "warning")
+      setMessages(prev => {
+        const updated = [...prev]
+        if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+          updated[aiMessageIndex].text = `❌ Terjadi kesalahan: ${error.message}`
+        }
+        return updated
+      })
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
   /* ── Handle user sending message ── */
   const handleSend = useCallback(async ({ text, files, previews }) => {
     const userMsg = { role: 'user', text, files, previews }
     setMessages(prev => [...prev, userMsg])
-    await simulateAIResponse(userMsg)
+    
+    const hasFiles = files && files.length > 0
+    if (hasFiles) {
+      await simulateAIResponse(userMsg)
+    } else {
+      await streamAgentInvoke(text)
+    }
   }, [simulateAIResponse])
 
   /* ── Quick action = auto-send ── */
@@ -119,30 +250,32 @@ export default function App() {
     showToast('📥 PDF berhasil di-download!', 'success')
   }
 
-  /* ── Send to CTO via MCP Gmail (mock) ── */
-  const handleSendCto = async () => {
-    setIsTyping(true)
-    await delay(1500)
+  /* ── Send to CTO via MCP Gmail ── */
+  const handleSendCto = async (rows) => {
+    const dataString = JSON.stringify(rows, null, 2)
+    const prompt = `Kirim email berisi data nasabah berikut ke email neutracksudo@gmail.com. Subjek email: '[BulkBuddy] Batch Data Nasabah — 11 Juni 2026'. Tulis format email yang sangat profesional dengan format khas Bank Mandiri (gunakan HTML table agar rapi di body email). Data nasabah: \n${dataString}`
+    
+    // Add user intent message to the chat first
     setMessages(prev => [...prev, {
-      role: 'ai',
-      text: '📧 PDF berhasil dikirim ke CTO via MCP Gmail!\n\n📬 To: cto@bankmandiri.co.id\n📝 Subject: [BulkBuddy] Batch Data Nasabah — 11 Juni 2026\n✅ Status: Terkirim',
+      role: 'user',
+      text: 'Kirim laporan data nasabah ini ke CTO via Gmail'
     }])
-    setIsTyping(false)
-    showToast('📧 Email berhasil dikirim ke CTO!', 'info')
+
+    await streamAgentInvoke(prompt, 'Kirim ke CTO')
   }
 
   /* ── Save to Sheet via MCP ── */
-  const handleSaveToSheet = async (updatedData, mcpPayload) => {
-    setIsTyping(true)
-    await delay(1000)
-    // mcpPayload is the MCP-ready JSON (CSV-header-keyed rows + metadata)
-    const preview = JSON.stringify(mcpPayload || updatedData, null, 2)
+  const handleSaveToSheet = async (updatedData) => {
+    const dataString = JSON.stringify(updatedData, null, 2)
+    const prompt = `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
+
+    // Add user intent message to the chat first
     setMessages(prev => [...prev, {
-      role: 'ai',
-      text: `✅ AI mengirim ${updatedData.length} baris ke Google Sheets via MCP Spreadsheet:\n\n\`\`\`json\n${preview.slice(0, 600)}${preview.length > 600 ? '\n...' : ''}\n\`\`\``,
+      role: 'user',
+      text: 'Simpan data nasabah ini ke Google Sheets'
     }])
-    setIsTyping(false)
-    showToast('📊 Data berhasil disimpan ke Google Sheets!', 'success')
+
+    await streamAgentInvoke(prompt, 'Simpan ke Sheets')
   }
 
   const isEmpty = messages.length === 0
