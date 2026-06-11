@@ -60,7 +60,7 @@ def get_tools_info():
     
     try:
         print("Fetching tools info from Supabase...")
-        response = supabase.table('tools_with_decrypted_keys').select("*").execute()
+        response = supabase.table('tools_with_decrypted_keys').select("*").eq("tool_name", "google-mcp").execute()
         
         if response.data is None:
             return []

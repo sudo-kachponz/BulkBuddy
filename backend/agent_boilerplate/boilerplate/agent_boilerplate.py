@@ -422,7 +422,7 @@ class AgentBoilerplate:
         Invoke an agent with the provided input (stream mode).
         """
         import time
-        from langchain.callbacks.base import BaseCallbackHandler
+        from langchain_core.callbacks import BaseCallbackHandler
         from langchain_core.runnables import RunnableConfig
 
         # Start timing the entire lifecycle

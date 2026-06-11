@@ -24,10 +24,11 @@ def get_all_tools() -> List[Dict[str, Any]]:
     # Initialize Supabase client
     supabase = create_client(supabase_url, supabase_key)
     
-    # Get all tools from the database with decrypted API keys
+    # Get only google-mcp tool from the database
     response = (
         supabase.table("tools_with_decrypted_keys")
         .select("*")
+        .eq("tool_name", "google-mcp")
         .execute()
     )
     
