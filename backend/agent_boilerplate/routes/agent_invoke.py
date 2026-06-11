@@ -385,18 +385,22 @@ async def invoke_agent_stream(
             async def stream_with_vlm():
                 import json
                 
-                # handle multimodal augmentation before streaming
-                max_new_tokens = getattr(agent_input, "max_new_tokens", None) or (getattr(agent_input, "input", {}) or {}).get("max_new_tokens", None)
-                model_name = agent_input.metadata.model_name if hasattr(agent_input, "metadata") and hasattr(agent_input.metadata, "model_name") else None
-                
-                # Check if there's an image before showing VLM status
-                image_path = None
+                # Get input dict safely
+                input_dict = {}
                 if hasattr(agent_input, 'input'):
                     if hasattr(agent_input.input, 'dict') and callable(agent_input.input.dict):
                         input_dict = agent_input.input.dict()
+                    elif hasattr(agent_input.input, 'model_dump') and callable(agent_input.input.model_dump):
+                        input_dict = agent_input.input.model_dump()
                     else:
                         input_dict = agent_input.input if isinstance(agent_input.input, dict) else dict(agent_input.input)
-                    image_path = input_dict.get('image_path')
+                
+                # handle multimodal augmentation before streaming
+                max_new_tokens = getattr(agent_input, "max_new_tokens", None) or input_dict.get("max_new_tokens", None)
+                model_name = agent_input.metadata.model_name if hasattr(agent_input, "metadata") and hasattr(agent_input.metadata, "model_name") else None
+                
+                # Check if there's an image before showing VLM status
+                image_path = input_dict.get('image_path')
                 
                 if image_path:
                     # Yield initial status only if there's an image
