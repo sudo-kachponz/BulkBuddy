@@ -1,38 +1,13 @@
 import { useState, useCallback } from 'react'
-import { Sparkles } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import ChatArea from './components/ChatArea'
 import InputBar from './components/InputBar'
+import InteractiveTutorial from './components/InteractiveTutorial'
 import { MOCK_NASABAH, QUICK_ACTIONS } from './data/mockData'
+import mandiriLogo from './assets/bankmandiri_light.png'
 
 /* ── Helper: simulate AI delay ── */
 const delay = (ms) => new Promise(r => setTimeout(r, ms))
-
-/* ── Quick Action Chips ── */
-function QuickActions({ onSelect }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 px-4 fade-in">
-      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary-500 to-blue-400 flex items-center justify-center shadow-xl shadow-primary-500/20 mb-5">
-        <Sparkles size={28} className="text-white" />
-      </div>
-      <h2 className="text-2xl font-bold text-slate-800 mb-2">Halo! Ada yang bisa dibantu? 👋</h2>
-      <p className="text-sm text-slate-400 mb-8 text-center max-w-md">
-        Upload form fisik nasabah untuk ekstraksi data otomatis, atau pilih aksi di bawah.
-      </p>
-      <div className="flex flex-wrap justify-center gap-3">
-        {QUICK_ACTIONS.map(action => (
-          <button key={action.id} onClick={() => onSelect(action.message)}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-200 shadow-sm
-              text-sm font-medium text-slate-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700
-              hover:shadow-md active:scale-[0.97] transition-all duration-200 cursor-pointer">
-            <span className="text-lg">{action.emoji}</span>
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /* ── Toast Component ── */
 function Toast({ toast, onClose }) {
@@ -72,14 +47,12 @@ export default function App() {
     const isInputRequest = userMsg.text.toLowerCase().includes('input') || hasFiles
 
     if (isInputRequest && hasFiles) {
-      // Step 1: Acknowledge
       await delay(1200)
       setMessages(prev => [...prev, {
         role: 'ai',
         text: `📄 Menerima ${userMsg.files.length} dokumen. Memproses OCR & ekstraksi data...`,
       }])
 
-      // Step 2: Show extracted cards (use mock data, one per file up to 5)
       await delay(2000)
       const usedData = MOCK_NASABAH.slice(0, Math.min(userMsg.files.length, MOCK_NASABAH.length))
       setMessages(prev => [...prev, {
@@ -88,15 +61,13 @@ export default function App() {
         dataCards: usedData,
       }])
 
-      // Step 3: Show spreadsheet table
       await delay(1500)
       setMessages(prev => [...prev, {
         role: 'ai',
-        text: '📊 Spreadsheet sudah siap. Silakan review data di bawah, lalu export PDF atau kirim langsung ke CTO.',
+        text: '📊 Spreadsheet sudah siap. Klik sel mana saja untuk mengedit langsung, lalu klik "Simpan ke Sheet" atau kirim ke CTO.',
         spreadsheet: usedData,
       }])
     } else if (isInputRequest && !hasFiles) {
-      // No files attached
       await delay(1000)
       setMessages(prev => [...prev, {
         role: 'ai',
@@ -115,7 +86,6 @@ export default function App() {
         text: '📋 Batch terakhir: 5 nasabah berhasil diinput pada 10 Juni 2026 pukul 14:30 WIB. Status: ✅ Semua data sudah dikirim ke CTO.',
       }])
     } else {
-      // Generic response
       await delay(800)
       setMessages(prev => [...prev, {
         role: 'ai',
@@ -128,11 +98,8 @@ export default function App() {
 
   /* ── Handle user sending message ── */
   const handleSend = useCallback(async ({ text, files, previews }) => {
-    // Add user message to chat
     const userMsg = { role: 'user', text, files, previews }
     setMessages(prev => [...prev, userMsg])
-
-    // Trigger AI response
     await simulateAIResponse(userMsg)
   }, [simulateAIResponse])
 
@@ -158,10 +125,24 @@ export default function App() {
     await delay(1500)
     setMessages(prev => [...prev, {
       role: 'ai',
-      text: '📧 PDF berhasil dikirim ke CTO via MCP Gmail!\n\n📬 To: cto@bank.co.id\n📝 Subject: [BulkBuddy] Batch Data Nasabah — 11 Juni 2026\n✅ Status: Terkirim',
+      text: '📧 PDF berhasil dikirim ke CTO via MCP Gmail!\n\n📬 To: cto@bankmandiri.co.id\n📝 Subject: [BulkBuddy] Batch Data Nasabah — 11 Juni 2026\n✅ Status: Terkirim',
     }])
     setIsTyping(false)
     showToast('📧 Email berhasil dikirim ke CTO!', 'info')
+  }
+
+  /* ── Save to Sheet via MCP ── */
+  const handleSaveToSheet = async (updatedData, mcpPayload) => {
+    setIsTyping(true)
+    await delay(1000)
+    // mcpPayload is the MCP-ready JSON (CSV-header-keyed rows + metadata)
+    const preview = JSON.stringify(mcpPayload || updatedData, null, 2)
+    setMessages(prev => [...prev, {
+      role: 'ai',
+      text: `✅ AI mengirim ${updatedData.length} baris ke Google Sheets via MCP Spreadsheet:\n\n\`\`\`json\n${preview.slice(0, 600)}${preview.length > 600 ? '\n...' : ''}\n\`\`\``,
+    }])
+    setIsTyping(false)
+    showToast('📊 Data berhasil disimpan ke Google Sheets!', 'success')
   }
 
   const isEmpty = messages.length === 0
@@ -169,6 +150,11 @@ export default function App() {
   return (
     <div className="h-screen flex font-poppins bg-[#f0f4f8]">
       <Toast toast={toast} onClose={() => setToast(null)} />
+
+      {/* Mandiri Logo — pojok kanan atas */}
+      <div className="fixed top-3 right-5 z-50">
+        <img src={mandiriLogo} alt="Bank Mandiri" className="h-8 object-contain" />
+      </div>
 
       {/* Sidebar */}
       <Sidebar
@@ -182,24 +168,27 @@ export default function App() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
           <div>
-            <h1 className="text-sm font-bold text-slate-800">BulkBuddy AI Agent</h1>
-            <p className="text-[11px] text-slate-400">Automasi input form fisik via MCP</p>
+            <h1 className="text-sm font-bold text-slate-800">AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN</h1>
+            <p className="text-[11px] text-slate-400">PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION</p>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-semibold text-emerald-600">Online</span>
+          <div className="flex items-center gap-4 mr-32">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-emerald-600">Online</span>
+            </div>
           </div>
         </div>
 
-        {/* Chat area or empty state */}
+        {/* Chat area or empty state (tutorial) */}
         {isEmpty ? (
-          <QuickActions onSelect={handleQuickAction} />
+          <InteractiveTutorial onQuickAction={handleQuickAction} />
         ) : (
           <ChatArea
             messages={messages}
             isTyping={isTyping}
             onExportPdf={handleExportPdf}
             onSendCto={handleSendCto}
+            onSaveToSheet={handleSaveToSheet}
           />
         )}
 

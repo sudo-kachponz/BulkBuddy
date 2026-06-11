@@ -1,8 +1,23 @@
-import { CheckCircle2, AlertTriangle, Download, Send, FileText } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { CheckCircle2, AlertTriangle, Download, Send, FileText, Save, Pencil, X, Check } from 'lucide-react'
+import { NASABAH_COLUMNS, PRIMARY_COLUMNS, toMCPPayload } from '../data/schema'
+import sheetsIcon from '../assets/sheets.png'
+import mailIcon from '../assets/mail.png'
 
 /* ── Per-image extracted data card ── */
 export function ExtractedDataCard({ data }) {
   const isLow = data.confidence < 80
+  const displayFields = [
+    ['Nama', data.nama],
+    ['No KTP', data.no_ktp],
+    ['Kelamin', data.kelamin === 'M' ? 'Laki-laki' : 'Perempuan'],
+    ['Tgl Lahir', data.tgl_lhr],
+    ['Kota Lahir', data.kota_lhr],
+    ['Ibu Kandung', data.ibu_kandung],
+    ['Handphone', data.handphone],
+    ['Alamat', data.alamat1],
+  ]
+
   return (
     <div className={`rounded-2xl border p-4 transition-all duration-200 hover:shadow-md
       ${isLow ? 'bg-amber-50/60 border-amber-200' : 'bg-white/80 border-slate-200/70'}`}>
@@ -21,16 +36,11 @@ export function ExtractedDataCard({ data }) {
         </span>
       </div>
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-        {[
-          ['NIK', data.nik],
-          ['Nama', data.nama],
-          ['Telepon', data.telepon],
-          ['Ibu Kandung', data.ibuKandung],
-        ].map(([label, val]) => (
+        {displayFields.map(([label, val]) => (
           <div key={label} className="contents">
             <span className="text-slate-400 font-medium text-xs">{label}</span>
-            <span className={`font-semibold ${isLow && val.includes('?') ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-slate-800'}`}>
-              {val}
+            <span className={`font-semibold ${isLow && String(val).length > 16 ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-slate-800'}`}>
+              {val || '—'}
             </span>
           </div>
         ))}
@@ -39,55 +49,204 @@ export function ExtractedDataCard({ data }) {
   )
 }
 
+/* ── Inline editable cell ── */
+function EditableCell({ value, onChange, isEditing, onStartEdit, onCommit, onCancel }) {
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') onCommit()
+    if (e.key === 'Escape') onCancel()
+  }
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full px-2 py-1 text-xs rounded-lg border-2 border-primary-400 bg-primary-50 text-slate-800
+            focus:outline-none focus:ring-2 focus:ring-primary-300 font-medium"
+        />
+        <button onClick={onCommit}
+          className="p-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-600 transition-colors shrink-0 cursor-pointer">
+          <Check size={12} />
+        </button>
+        <button onClick={onCancel}
+          className="p-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-500 transition-colors shrink-0 cursor-pointer">
+          <X size={12} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={onStartEdit}
+      title="Klik untuk edit"
+      className="w-full text-left group/cell flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-primary-50 transition-colors cursor-pointer"
+    >
+      <span className="text-xs text-slate-700 truncate">{String(value) || '—'}</span>
+      <Pencil size={10} className="text-slate-300 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+    </button>
+  )
+}
+
 /* ── Compiled spreadsheet table (AI output) ── */
-export function SpreadsheetTable({ data, onExportPdf, onSendCto }) {
+export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }) {
+  const [rows, setRows] = useState(() => data.map(d => ({ ...d })))
+  const [editCell, setEditCell] = useState(null)
+  const [draft, setDraft] = useState('')
+  const [savedRows, setSavedRows] = useState([])
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const startEdit = (rowIdx, col, currentVal) => {
+    setEditCell({ rowIdx, col })
+    setDraft(String(currentVal ?? ''))
+  }
+
+  const commitEdit = () => {
+    if (!editCell) return
+    const { rowIdx, col } = editCell
+    const prev = String(rows[rowIdx][col] ?? '')
+    if (draft !== prev) {
+      setRows(r => r.map((row, i) => i === rowIdx ? { ...row, [col]: draft } : row))
+      setHasChanges(true)
+    }
+    setEditCell(null)
+  }
+
+  const cancelEdit = () => {
+    setEditCell(null)
+    setDraft('')
+  }
+
+  const handleSave = () => {
+    const payload = toMCPPayload(rows)
+    setSavedRows(rows.map(r => r.id))
+    setHasChanges(false)
+    onSaveToSheet && onSaveToSheet(rows, payload)
+  }
+
   return (
     <div className="rounded-2xl border border-slate-200/70 bg-white/90 backdrop-blur-sm overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="flex items-center gap-2 px-5 py-3.5 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-slate-100">
-        <span className="text-base">📊</span>
-        <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {data.length} Nasabah</span>
+      <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-slate-100">
+        <img src={sheetsIcon} alt="Sheets" className="w-6 h-6 object-contain" />
+        <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {rows.length} Nasabah</span>
+        <span className="text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
+        {hasChanges && (
+          <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full animate-pulse">
+            ✏️ Ada perubahan belum disimpan
+          </span>
+        )}
+      </div>
+
+      {/* Hint */}
+      <div className="px-5 py-2 bg-slate-50/60 border-b border-slate-100 flex items-center gap-2">
+        <Pencil size={11} className="text-slate-400" />
+        <span className="text-[11px] text-slate-400">Klik sel mana saja untuk mengedit data langsung. Scroll horizontal untuk kolom lainnya →</span>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto chat-scroll">
+        <table className="w-max text-sm">
           <thead>
             <tr className="bg-slate-50/80 border-b border-slate-100">
-              {['No', 'NIK', 'Nama Lengkap', 'No. Telepon', 'Nama Ibu Kandung'].map(h => (
-                <th key={h} className="text-left px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
-              ))}
+              <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider min-w-[40px] sticky left-0 bg-slate-50/95 z-10">
+                No
+              </th>
+              {NASABAH_COLUMNS.map(col => {
+                const isPrimary = PRIMARY_COLUMNS.includes(col.key)
+                return (
+                  <th key={col.key}
+                    className={`text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider ${col.width}
+                      ${isPrimary ? 'text-primary-600 bg-primary-50/40' : 'text-slate-400'}`}>
+                    {col.label}
+                    {col.source === 'ocr' && <span className="ml-1 text-[8px] text-blue-400 normal-case">(OCR)</span>}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data.map((row, i) => (
-              <tr key={row.id} className="hover:bg-primary-50/30 transition-colors">
-                <td className="px-4 py-2.5 text-slate-400 font-medium text-xs">{i + 1}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{row.nik}</td>
-                <td className="px-4 py-2.5 font-semibold text-slate-800 text-xs">{row.nama}</td>
-                <td className="px-4 py-2.5 text-slate-600 text-xs">{row.telepon}</td>
-                <td className="px-4 py-2.5 text-slate-600 text-xs">{row.ibuKandung}</td>
-              </tr>
-            ))}
+            {rows.map((row, i) => {
+              const isSaved = savedRows.includes(row.id)
+              const isLowConf = row.confidence < 80
+              return (
+                <tr key={row.id}
+                  className={`transition-colors ${
+                    isSaved ? 'bg-emerald-50/40' :
+                    isLowConf ? 'bg-amber-50/30' :
+                    'hover:bg-primary-50/30'
+                  }`}>
+                  <td className="px-3 py-2 text-slate-400 font-medium text-xs sticky left-0 bg-white/95 z-10 border-r border-slate-100">
+                    <div className="flex items-center gap-1.5">
+                      <span>{i + 1}</span>
+                      {isLowConf && <AlertTriangle size={11} className="text-amber-400" />}
+                    </div>
+                  </td>
+                  {NASABAH_COLUMNS.map(col => {
+                    const isEditing = editCell?.rowIdx === i && editCell?.col === col.key
+                    const isPrimary = PRIMARY_COLUMNS.includes(col.key)
+                    return (
+                      <td key={col.key}
+                        className={`px-2 py-1.5 ${col.width} ${isPrimary ? 'bg-primary-50/20' : ''}`}>
+                        <EditableCell
+                          value={isEditing ? draft : (row[col.key] ?? '')}
+                          onChange={setDraft}
+                          isEditing={isEditing}
+                          onStartEdit={() => startEdit(i, col.key, row[col.key])}
+                          onCommit={commitEdit}
+                          onCancel={cancelEdit}
+                        />
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
+        <button onClick={handleSave}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200
+            ${hasChanges
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/20 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97]'
+              : 'bg-white border border-slate-200 text-slate-400 cursor-default'
+            }`}
+          disabled={!hasChanges}
+        >
+          <img src={sheetsIcon} alt="Sheets" className="w-4 h-4 object-contain" />
+          <Save size={14} />
+          Simpan ke Sheets
+        </button>
+
         <button onClick={onExportPdf}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
             bg-white border border-slate-200 text-slate-700 shadow-sm
             hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700
             active:scale-[0.97] transition-all duration-200">
           <Download size={16} />
-          Export as PDF
+          Export PDF
         </button>
-        <button onClick={onSendCto}
+
+        <button onClick={() => onSendCto(rows)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
-            bg-gradient-to-r from-primary-600 to-blue-500 text-white shadow-md shadow-primary-500/20
+            bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-md shadow-rose-500/20
             hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-200">
-          <Send size={16} />
+          <img src={mailIcon} alt="Gmail" className="w-4 h-4 object-contain" />
           Kirim ke CTO
         </button>
       </div>

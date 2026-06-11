@@ -54,7 +54,7 @@ function UserBubble({ message }) {
 }
 
 /* ── AI Message Bubble ── */
-function AIBubble({ message, onExportPdf, onSendCto }) {
+function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet }) {
   return (
     <div className="flex items-start gap-3 msg-enter">
       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shrink-0 shadow-sm">
@@ -63,7 +63,7 @@ function AIBubble({ message, onExportPdf, onSendCto }) {
       <div className="max-w-[80%] space-y-3">
         {/* Text content */}
         {message.text && (
-          <div className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed">
+          <div className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line">
             {message.text}
           </div>
         )}
@@ -79,7 +79,12 @@ function AIBubble({ message, onExportPdf, onSendCto }) {
 
         {/* Spreadsheet table */}
         {message.spreadsheet && (
-          <SpreadsheetTable data={message.spreadsheet} onExportPdf={onExportPdf} onSendCto={onSendCto} />
+          <SpreadsheetTable
+            data={message.spreadsheet}
+            onExportPdf={onExportPdf}
+            onSendCto={onSendCto}
+            onSaveToSheet={onSaveToSheet}
+          />
         )}
       </div>
     </div>
@@ -87,7 +92,7 @@ function AIBubble({ message, onExportPdf, onSendCto }) {
 }
 
 /* ── Main Chat Area ── */
-export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto }) {
+export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto })
       {messages.map((msg, i) => (
         msg.role === 'user'
           ? <UserBubble key={i} message={msg} />
-          : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} />
+          : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} />
       ))}
       {isTyping && <TypingIndicator />}
       <div ref={bottomRef} />
