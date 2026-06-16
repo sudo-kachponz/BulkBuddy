@@ -31,7 +31,8 @@ After receiving tool results, provide them to the user in a clear, helpful forma
     else:
         system_message = SystemMessage(content="You are a helpful AI assistant.")
     
-    return create_react_agent(model, langchain_tools, checkpointer=memory, state_modifier=system_message)
+    #return create_react_agent(model, langchain_tools, checkpointer=memory, state_modifier=system_message)
+    return create_react_agent(model, langchain_tools, checkpointer=memory, prompt=system_message)
 # Example usage
 if __name__ == "__main__":
     from langgraph.checkpoint.memory import MemorySaver

@@ -28,7 +28,7 @@ def get_all_tools() -> List[Dict[str, Any]]:
     response = (
         supabase.table("tools_with_decrypted_keys")
         .select("*")
-        .eq("tool_name", "google-mcp")
+        .eq("name", "google-mcp")
         .execute()
     )
     
