@@ -119,7 +119,7 @@ export default function App() {
             }
           },
           metadata: {
-            model_name: "anthropic/claude-3.5-sonnet",
+            model_name: "google/gemini-2.5-flash-lite",
             reset_memory: false,
             load_from_json: true,
             agent_style: ""
