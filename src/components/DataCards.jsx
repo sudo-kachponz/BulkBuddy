@@ -108,6 +108,13 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
   const [savedRows, setSavedRows] = useState([])
   const [hasChanges, setHasChanges] = useState(false)
 
+  // Update rows if new data streams in (length changes)
+  useEffect(() => {
+    if (data.length !== rows.length) {
+      setRows(data.map(d => ({ ...d })))
+    }
+  }, [data.length])
+
   const startEdit = (rowIdx, col, currentVal) => {
     setEditCell({ rowIdx, col })
     setDraft(String(currentVal ?? ''))
