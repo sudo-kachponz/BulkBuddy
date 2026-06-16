@@ -163,10 +163,39 @@ export default function App() {
               const data = JSON.parse(rawData)
               if (currentEvent === "token") {
                 aiText += data.token
+                
+                // Live parse JSON array and hide raw JSON text
+                let displayHtml = aiText;
+                let spreadsheetData = null;
+                
+                const jsonStart = aiText.indexOf('```json');
+                if (jsonStart !== -1) {
+                  const jsonEnd = aiText.indexOf('```', jsonStart + 7);
+                  let jsonStr = '';
+                  if (jsonEnd !== -1) {
+                    jsonStr = aiText.substring(jsonStart + 7, jsonEnd);
+                    displayHtml = aiText.substring(0, jsonStart) + aiText.substring(jsonEnd + 3);
+                  } else {
+                    jsonStr = aiText.substring(jsonStart + 7);
+                    displayHtml = aiText.substring(0, jsonStart);
+                  }
+                  
+                  const objectMatches = jsonStr.match(/\{[^{}]+\}/g);
+                  if (objectMatches) {
+                     spreadsheetData = [];
+                     for (const obj of objectMatches) {
+                       try { spreadsheetData.push(JSON.parse(obj)); } catch (e) {}
+                     }
+                  }
+                }
+
                 setMessages(prev => {
                   const updated = [...prev]
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                    updated[aiMessageIndex].text = aiText
+                    updated[aiMessageIndex].text = displayHtml.trim()
+                    if (spreadsheetData && spreadsheetData.length > 0) {
+                      updated[aiMessageIndex].spreadsheet = spreadsheetData;
+                    }
                   }
                   return updated
                 })
@@ -194,26 +223,6 @@ export default function App() {
               console.error("Failed to parse SSE data JSON:", rawData, e)
             }
           }
-        }
-      }
-
-      // Post-stream JSON extraction for Live Spreadsheet UI
-      const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
-      const match = aiText.match(jsonRegex);
-      if (match) {
-        try {
-          const spreadsheetData = JSON.parse(match[1]);
-          setMessages(prev => {
-            const updated = [...prev];
-            if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-               updated[aiMessageIndex].spreadsheet = spreadsheetData;
-               // Hapus blok JSON dari teks agar tidak tampil mentah
-               updated[aiMessageIndex].text = updated[aiMessageIndex].text.replace(match[0], '').trim();
-            }
-            return updated;
-          });
-        } catch (e) {
-          console.error("Failed to parse extracted JSON from AI", e);
         }
       }
 
