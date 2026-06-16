@@ -380,15 +380,15 @@ class AgentBoilerplate:
             # Agent with tools
             print("Using agent with tools")
             print("MCP config:", mcp_config)
-            async with MultiServerMCPClient(mcp_config) as client:
-                langchain_tools = client.get_tools()
-                agent = get_react_agent(
-                    model_name=model_name,
-                    temperature=temperature,
-                    langchain_tools=langchain_tools,
-                    memory=memory
-                )
-                response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
+            client = MultiServerMCPClient(mcp_config)
+            langchain_tools = await client.get_tools()
+            agent = get_react_agent(
+                model_name=model_name,
+                temperature=temperature,
+                langchain_tools=langchain_tools,
+                memory=memory
+            )
+            response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
         else:
             # Agent without tools
             print("Using agent without tools")
@@ -470,8 +470,7 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            await client.__aenter__()  # Manually entering async context
-            langchain_tools = client.get_tools()
+            langchain_tools = await client.get_tools()
             
             if use_react_text:
                 print(f"Using ReAct text-based agent for {model_name}")
@@ -623,8 +622,7 @@ class AgentBoilerplate:
 
         finally:
             # Step 8: Ensure proper cleanup
-            if client:
-                await client.__aexit__(None, None, None)  # Manually exiting async context
+            pass
 
 
 

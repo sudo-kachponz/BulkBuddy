@@ -19,7 +19,7 @@ def get_react_agent(model_name="custom-vlm", temperature=0, langchain_tools=[], 
     Returns:
         A configured ReAct agent
     """
-    # model_name = "google/gemini-2.5-flash-lite" # for tools, one of the most general model
+    # model_name = "anthropic/claude-sonnet-4.6" # for tools, one of the most general model
     model = get_llms(model_name, temperature)
     
     # Create system prompt that encourages tool usage

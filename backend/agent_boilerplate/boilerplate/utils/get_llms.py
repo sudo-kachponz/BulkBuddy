@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_llms(model_name: str="google/gemini-2.5-flash-lite", temperature=0):
+def get_llms(model_name: str="anthropic/claude-sonnet-4.6", temperature=0):
     """
     Helper function to get LLM instance.
     
@@ -14,7 +14,7 @@ def get_llms(model_name: str="google/gemini-2.5-flash-lite", temperature=0):
     
     Args:
         model_name: The name of the model to use
-                   - "google/gemini-2.5-flash-lite" (default) for robust tool calling
+                   - "anthropic/claude-sonnet-4.6" (default) for robust tool calling
                    - "google/gemma-2-9b-it" for Gemma 2 9B via OpenRouter
                    - "google/gemma-2-27b-it" for Gemma 2 27B via OpenRouter
                    - "openai/gpt-4o-mini" for GPT-4o mini via OpenRouter
@@ -26,7 +26,7 @@ def get_llms(model_name: str="google/gemini-2.5-flash-lite", temperature=0):
         A configured LLM instance
     """
     if model_name == "custom-vlm":
-        model_name = "google/gemini-2.5-flash-lite" # fallback to openrouter default
+        model_name = "anthropic/claude-sonnet-4.6" # fallback to openrouter default
 
     # OpenRouter models (supports tool calling)
     if "/" in model_name or model_name in ["gemma-2-9b-it", "gemma-2-27b-it"]:
