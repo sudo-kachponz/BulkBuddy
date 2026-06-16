@@ -197,6 +197,26 @@ export default function App() {
         }
       }
 
+      // Post-stream JSON extraction for Live Spreadsheet UI
+      const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+      const match = aiText.match(jsonRegex);
+      if (match) {
+        try {
+          const spreadsheetData = JSON.parse(match[1]);
+          setMessages(prev => {
+            const updated = [...prev];
+            if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+               updated[aiMessageIndex].spreadsheet = spreadsheetData;
+               // Hapus blok JSON dari teks agar tidak tampil mentah
+               updated[aiMessageIndex].text = updated[aiMessageIndex].text.replace(match[0], '').trim();
+            }
+            return updated;
+          });
+        } catch (e) {
+          console.error("Failed to parse extracted JSON from AI", e);
+        }
+      }
+
       // Post-stream actions
       if (actionType === 'Kirim ke CTO') {
         showToast('📧 Email berhasil dikirim ke CTO!', 'info')
@@ -287,7 +307,17 @@ Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat y
 
 Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`;
       } else if (text.toLowerCase().includes('saya ingin input data nasabah baru dari form fisik')) {
-        promptToSend = "Tolong ambil dan baca data nasabah terbaru dari Google Sheets menggunakan tool MCP yang tersedia. Tampilkan rangkuman datanya dengan rapi. Setelah menampilkannya, tanyakan kepada saya persis kalimat ini di akhir pesanmu: 'Apa anda yakin mau mengirimkan PDF dan .excel ke gmail?'";
+        promptToSend = `Tolong ambil dan baca data nasabah terbaru dari Google Sheets menggunakan tool MCP yang tersedia.
+
+SANGAT PENTING: Kamu WAJIB mengeluarkan output data yang berhasil dibaca dalam blok kode JSON yang MURNI.
+Gunakan format list of objects persis seperti ini:
+\`\`\`json
+[
+  { "id": "1", "nama": "...", "kelamin": "...", "tgl_lhr": "...", "no_ktp": "...", "ibu_kandung": "...", "handphone": "...", "alamat1": "...", "kodepos": "...", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
+]
+\`\`\`
+
+Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di bawahnya, dan pada baris paling akhir, kamu HARUS menanyakan persis kalimat ini: 'Apa anda yakin mau mengirimkan PDF dan .excel ke gmail?'`;
       }
       await streamAgentInvoke(promptToSend)
     }
