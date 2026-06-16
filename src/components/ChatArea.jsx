@@ -54,7 +54,7 @@ function UserBubble({ message }) {
 }
 
 /* ── AI Message Bubble ── */
-function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet }) {
+function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend }) {
   return (
     <div className="flex items-start gap-3 msg-enter">
       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shrink-0 shadow-sm">
@@ -65,6 +65,18 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet }) {
         {message.text && (
           <div className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line">
             {message.text}
+          </div>
+        )}
+
+        {/* Confirmation Button */}
+        {message.text && message.text.toLowerCase().includes('apa anda yakin mau mengirimkan pdf dan .excel ke gmail?') && (
+          <div className="mt-3">
+            <button
+              onClick={onConfirmSend}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl text-sm shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+            >
+              <span>✅ Ya, Download & Kirim ke CTO</span>
+            </button>
           </div>
         )}
 
@@ -92,7 +104,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet }) {
 }
 
 /* ── Main Chat Area ── */
-export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet }) {
+export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -104,7 +116,7 @@ export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, o
       {messages.map((msg, i) => (
         msg.role === 'user'
           ? <UserBubble key={i} message={msg} />
-          : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} />
+          : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} onConfirmSend={onConfirmSend} />
       ))}
       {isTyping && <TypingIndicator />}
       <div ref={bottomRef} />

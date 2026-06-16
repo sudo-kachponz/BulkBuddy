@@ -225,7 +225,7 @@ export default function App() {
   const handleSend = useCallback(async ({ text, files, previews }) => {
     const userMsg = { role: 'user', text, files, previews }
     setMessages(prev => [...prev, userMsg])
-    
+
     const hasFiles = files && files.length > 0
     if (hasFiles) {
       await simulateAIResponse(userMsg)
@@ -283,9 +283,11 @@ Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, y
   </tr>
 </table><br>
 
-Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
+Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yangহিংস yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
 
 Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`;
+      } else if (text.toLowerCase().includes('saya ingin input data nasabah baru dari form fisik')) {
+        promptToSend = "Tolong ambil dan baca data nasabah terbaru dari Google Sheets menggunakan tool MCP yang tersedia. Tampilkan rangkuman datanya dengan rapi. Setelah menampilkannya, tanyakan kepada saya persis kalimat ini di akhir pesanmu: 'Apa anda yakin mau mengirimkan PDF dan .excel ke gmail?'";
       }
       await streamAgentInvoke(promptToSend)
     }
@@ -307,11 +309,17 @@ Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima ka
     showToast('📥 PDF berhasil di-download!', 'success')
   }
 
+  /* ── Confirm Send Flow (Live Data -> CTO) ── */
+  const handleConfirmSend = () => {
+    handleExportPdf()
+    handleSend({ text: 'Tolong kirim email batch ke CTO untuk pembukaan rekening.', files: [], previews: [] })
+  }
+
   /* ── Send to CTO via MCP Gmail ── */
   const handleSendCto = async (rows) => {
     const dataString = JSON.stringify(rows, null, 2)
     const prompt = `Kirim email berisi data nasabah berikut ke email neutracksudo@gmail.com. Subjek email: '[BulkBuddy] Batch Data Nasabah — 11 Juni 2026'. Tulis format email yang sangat profesional dengan format khas Bank Mandiri (gunakan HTML table agar rapi di body email). Data nasabah: \n${dataString}`
-    
+
     // Add user intent message to the chat first
     setMessages(prev => [...prev, {
       role: 'user',
@@ -379,6 +387,7 @@ Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima ka
             onExportPdf={handleExportPdf}
             onSendCto={handleSendCto}
             onSaveToSheet={handleSaveToSheet}
+            onConfirmSend={handleConfirmSend}
           />
         )}
 
