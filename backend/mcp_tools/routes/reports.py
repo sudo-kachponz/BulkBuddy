@@ -5,11 +5,42 @@ from fpdf import FPDF
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
 router = APIRouter(prefix="/api")
 
 class ReportRequest(BaseModel):
     data: List[Dict[str, Any]]
+    send_email: bool = False
+    to_email: str = "neutracksudo@gmail.com"
+
+def send_email_with_attachments(to_email: str, subject: str, html_body: str, file_paths: List[str]):
+    smtp_user = os.environ.get("SMTP_USERNAME")
+    smtp_pass = os.environ.get("SMTP_PASSWORD")
+
+    if not smtp_user or not smtp_pass:
+        raise Exception("SMTP credentials (SMTP_USERNAME, SMTP_PASSWORD) are missing in .env")
+
+    msg = MIMEMultipart()
+    msg['From'] = smtp_user
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(html_body, 'html'))
+
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                part = MIMEApplication(f.read(), Name=os.path.basename(file_path))
+                part['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+                msg.attach(part)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
 
 @router.post("/generate-reports")
 async def generate_reports(req: ReportRequest):
@@ -53,8 +84,60 @@ async def generate_reports(req: ReportRequest):
         pdf.ln()
 
     pdf.output(pdf_path)
+    
+    if req.send_email:
+        subject = "[Permohonan Pembukaan Rekening BULK Tabungan Reguler - PT. Sutit...]"
+        html_body = f"""
+        Kepada Yth. CTO Bank Mandiri,<br><br>
+        Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.<br><br>
+        <b>Lampiran Dokumen:</b> Terdapat di lampiran fisik email ini (PDF & Excel).<br>
+        ---<br><br>
+        <b>Cash & Trade Operations Group</b><br>
+        <b>Bulk Payment & Account Opening Department</b><br>
+        Sentra Mandiri Gedung B Lt. 4<br>
+        JL. RP Soeroso No. 2-4<br>
+        Jakarta 10330<br><br>
+        ---<br><br>
+        <b>Perihal:</b> : <b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b><br><br>
+        Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
+        <ul>
+        <li><b>Jumlah Rekening:</b> : <b>[{len(data)} Rekening (rincian terlampir)]</b></li>
+        <li><b>Jenis:</b> : ACTIVE</li>
+        <li><b>Kode Tabungan:</b> : TABMANDIRI</li>
+        </ul><br>
+        Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, yaitu :<br><br>
+        <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
+          <tr>
+            <th>Field</th>
+            <th>Keterangan</th>
+          </tr>
+          <tr>
+            <td>NIK</td>
+            <td>Wajib 16 Digit (sesuai e-KTP)</td>
+          </tr>
+          <tr>
+            <td>Nama</td>
+            <td>Ejaan/ spasi (sama persis dengan e-KTP)</td>
+          </tr>
+          <tr>
+            <td>Tanggal Lahir</td>
+            <td>Tanggal Bulan dan Tahun (sama persis dengan e-KTP)</td>
+          </tr>
+        </table><br>
+        Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
+        Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.
+        """
+        try:
+            send_email_with_attachments(req.to_email, subject, html_body, [pdf_path, excel_path])
+        except Exception as e:
+            return {
+                "error": f"Failed to send email: {str(e)}. Please check your SMTP_USERNAME and SMTP_PASSWORD in .env.",
+                "excel_path": excel_path,
+                "pdf_path": pdf_path
+            }
 
     return {
+        "message": "Reports generated and email sent successfully!" if req.send_email else "Reports generated",
         "excel_path": excel_path,
         "pdf_path": pdf_path
     }

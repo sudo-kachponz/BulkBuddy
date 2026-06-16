@@ -155,6 +155,19 @@ export default function App() {
           const line = lines[i].trim()
           if (!line) continue
 
+          const getDisplayHtml = (text) => {
+            const jsonStart = text.indexOf('```json');
+            if (jsonStart !== -1) {
+              const jsonEnd = text.indexOf('```', jsonStart + 7);
+              if (jsonEnd !== -1) {
+                return text.substring(0, jsonStart) + text.substring(jsonEnd + 3);
+              } else {
+                return text.substring(0, jsonStart);
+              }
+            }
+            return text;
+          };
+
           if (line.startsWith("event:")) {
             currentEvent = line.replace("event:", "").trim()
           } else if (line.startsWith("data:")) {
@@ -164,20 +177,16 @@ export default function App() {
               if (currentEvent === "token") {
                 aiText += data.token
                 
-                // Live parse JSON array and hide raw JSON text
-                let displayHtml = aiText;
-                let spreadsheetData = null;
-                
+                // Live parse JSON array
                 const jsonStart = aiText.indexOf('```json');
+                let spreadsheetData = null;
                 if (jsonStart !== -1) {
                   const jsonEnd = aiText.indexOf('```', jsonStart + 7);
                   let jsonStr = '';
                   if (jsonEnd !== -1) {
                     jsonStr = aiText.substring(jsonStart + 7, jsonEnd);
-                    displayHtml = aiText.substring(0, jsonStart) + aiText.substring(jsonEnd + 3);
                   } else {
                     jsonStr = aiText.substring(jsonStart + 7);
-                    displayHtml = aiText.substring(0, jsonStart);
                   }
                   
                   const objectMatches = jsonStr.match(/\{[^{}]+\}/g);
@@ -192,7 +201,7 @@ export default function App() {
                 setMessages(prev => {
                   const updated = [...prev]
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                    updated[aiMessageIndex].text = displayHtml.trim()
+                    updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
                       updated[aiMessageIndex].spreadsheet = spreadsheetData;
                     }
@@ -204,7 +213,15 @@ export default function App() {
                   setMessages(prev => {
                     const updated = [...prev]
                     if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                      updated[aiMessageIndex].text = `⏱️ Status: ${data.status}...\n\n${aiText}`
+                      updated[aiMessageIndex].text = `⏱️ Status: ${data.status}...\n\n${getDisplayHtml(aiText).trim()}`
+                    }
+                    return updated
+                  })
+                } else if (data.status === "Agent Execution End") {
+                  setMessages(prev => {
+                    const updated = [...prev]
+                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                      updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     }
                     return updated
                   })
@@ -214,7 +231,7 @@ export default function App() {
                 setMessages(prev => {
                   const updated = [...prev]
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                    updated[aiMessageIndex].text = `⏱️ ${statusSymbol} Tool [${data.tool_name}]: ${data.status}\n\n${aiText}`
+                    updated[aiMessageIndex].text = `⏱️ ${statusSymbol} Tool [${data.tool_name}]: ${data.status}\n\n${getDisplayHtml(aiText).trim()}`
                   }
                   return updated
                 })
@@ -350,98 +367,39 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
 
   /* ── Confirm Send Flow (Live Data -> CTO) ── */
   const handleConfirmSend = async (rows) => {
-    showToast('⏳ Membuat file PDF dan Excel di server...', 'info')
+    showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
+    
+    // Tambahkan user bubble biasa agar rapi
+    const userMsg = { role: 'user', text: 'Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
+    setMessages(prev => [...prev, userMsg])
+    
     try {
       const response = await fetch('http://localhost:8000/api/generate-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: rows || [] })
+        body: JSON.stringify({ data: rows || [], send_email: true, to_email: "neutracksudo@gmail.com" })
       })
       const result = await response.json()
       if (result.error) throw new Error(result.error)
       
-      showToast('✅ File berhasil dibuat! Mengunggah ke Drive...', 'success')
+      showToast('📧 Email beserta lampiran berhasil dikirim ke CTO!', 'success')
       
-      // 1. Tambahkan user bubble biasa agar rapi
-      const userMsg = { role: 'user', text: 'Tolong unggah file laporan PDF dan Excel ke Google Drive, lalu kirim email ke CTO.', files: [], previews: [] }
-      setMessages(prev => [...prev, userMsg])
+      // Tambahkan response AI instan
+      const aiMsg = { 
+        role: 'model', 
+        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
+      }
+      setMessages(prev => [...prev, aiMsg])
       
-      // 2. Tembak streamAgentInvoke dengan PROMPT KOMPLEKS
-      const promptToSend = `PENTING: Eksekusi langkah-langkah berikut secara berurutan!
-
-LANGKAH 1: UNGGAH KE GOOGLE DRIVE
-Data telah diekspor ke server lokal di path berikut:
-- File PDF: ${result.pdf_path}
-- File Excel: ${result.excel_path}
-
-Gunakan tool drive_upload_file dari MCP untuk mengunggah KEDUA file tersebut ke Google Drive. Dapatkan link tautan (URL) publik dari kedua file tersebut!
-
-LANGKAH 2: KIRIM EMAIL KE CTO
-Kirim email ke neutracksudo@gmail.com. SANGAT PENTING: Gunakan format HTML murni untuk body email. Gunakan tag <b> untuk bold, <br> untuk baris baru, dan <table> untuk tabel. Jangan gunakan Markdown.
-
-Subjek Email: [Permohonan Pembukaan Rekening BULK Tabungan Reguler - PT. Sutit...]
-
-Isi Email (Kirimkan persis string HTML di bawah ini sebagai body):
-
-Kepada Yth. CTO Bank Mandiri,<br><br>
-
-Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.<br><br>
-
-<b>Lampiran Dokumen dari Google Drive:</b><br>
-<ul>
-<li><a href="URL_LINK_PDF_YANG_KAMU_DAPATKAN_DARI_DRIVE">Download Laporan PDF</a></li>
-<li><a href="URL_LINK_EXCEL_YANG_KAMU_DAPATKAN_DARI_DRIVE">Download Laporan Excel</a></li>
-</ul><br>
-
----<br><br>
-
-<b>Cash & Trade Operations Group</b><br>
-<b>Bulk Payment & Account Opening Department</b><br>
-Sentra Mandiri Gedung B Lt. 4<br>
-JL. RP Soeroso No. 2-4<br>
-Jakarta 10330<br><br>
-
----<br><br>
-
-<b>Perihal:</b> : <b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b><br><br>
-
-Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
-
-<ul>
-<li><b>Jumlah Rekening:</b> : <b>[17 Rekening (rincian terlampir)]</b></li>
-<li><b>Jenis:</b> : ACTIVE</li>
-<li><b>Kode Tabungan:</b> : TABMANDIRI</li>
-</ul><br>
-
-Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, yaitu :<br><br>
-
-<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
-  <tr>
-    <th>Field</th>
-    <th>Keterangan</th>
-  </tr>
-  <tr>
-    <td>NIK</td>
-    <td>Wajib 16 Digit (sesuai e-KTP)</td>
-  </tr>
-  <tr>
-    <td>Nama</td>
-    <td>Ejaan/ spasi (sama persis dengan e-KTP)</td>
-  </tr>
-  <tr>
-    <td>Tanggal Lahir</td>
-    <td>Tanggal Bulan dan Tahun (sama persis dengan e-KTP)</td>
-  </tr>
-</table><br>
-
-Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
-
-Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`
-
-      await streamAgentInvoke(promptToSend)
     } catch (e) {
       console.error(e)
-      showToast('❌ Gagal membuat file laporan di server', 'error')
+      showToast('❌ Gagal mengirim email. Pastikan SMTP dikonfigurasi.', 'error')
+      
+      const aiMsg = { 
+        role: 'model', 
+        text: `❌ **Pengiriman Email Gagal**\n\nPesan Error: \`${e.message}\`\n\nPastikan kamu sudah menambahkan \`SMTP_USERNAME\` dan \`SMTP_PASSWORD\` yang valid (App Password) di dalam file \`.env\` server backend.`
+      }
+      setMessages(prev => [...prev, aiMsg])
     }
   }
 
