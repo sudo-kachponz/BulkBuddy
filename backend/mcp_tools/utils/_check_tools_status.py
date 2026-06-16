@@ -188,10 +188,35 @@ def start_tool(tool):
             
             # Start a thread to read output
             def read_output():
+                import re
+                import copy
                 for line in iter(process.stdout.readline, ''):
                     if line:
                         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                        logger.info(f"[{timestamp}][Tool {tool.get('name', 'unknown')}] {line.strip()}")
+                        clean_line = line.strip()
+                        logger.info(f"[{timestamp}][Tool {tool.get('name', 'unknown')}] {clean_line}")
+                        
+                        # Catch dynamic Uvicorn port
+                        match = re.search(r"Uvicorn running on http://(?:127\.0\.0\.1|localhost|0\.0\.0\.0):(\d+)", clean_line)
+                        if match:
+                            dynamic_port = match.group(1)
+                            logger.info(f"Caught dynamic port {dynamic_port} for tool '{tool.get('name', 'unknown')}'")
+                            
+                            if 'versions' in tool and tool['versions']:
+                                versions_copy = copy.deepcopy(tool['versions'])
+                                if 'released' in versions_copy[0]:
+                                    versions_copy[0]['released']['port'] = str(dynamic_port)
+                                    # Update the in-memory tool reference to prevent race condition with check_tools_status batch update
+                                    tool['versions'][0]['released']['port'] = str(dynamic_port)
+                                    
+                                    try:
+                                        supabase.table('tools').update({
+                                            "versions": versions_copy,
+                                            "on_status": "Online"
+                                        }).eq("tool_id", tool.get('tool_id')).execute()
+                                        logger.info(f"Updated database with dynamic port {dynamic_port} for tool {tool.get('tool_id')}")
+                                    except Exception as db_e:
+                                        logger.error(f"Failed to update dynamic port in database: {db_e}")
             
             import threading
             output_thread = threading.Thread(target=read_output)
