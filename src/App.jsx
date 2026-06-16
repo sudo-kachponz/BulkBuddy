@@ -232,43 +232,58 @@ export default function App() {
     } else {
       let promptToSend = text;
       if (text.toLowerCase().includes('tolong kirim email batch ke cto')) {
-        promptToSend = `Kirim email ke neutracksudo@gmail.com dengan format persis seperti ini:
+        promptToSend = `Kirim email ke neutracksudo@gmail.com. SANGAT PENTING: Gunakan format HTML murni untuk body email. Gunakan tag <b> untuk bold, <br> untuk baris baru, dan <table> untuk tabel. Jangan gunakan Markdown (* atau |).
 
 Subjek Email: [Permohonan Pembukaan Rekening BULK Tabungan Reguler - PT. Sutit...]
 
-**Isi Email:**
+Isi Email (Kirimkan persis string HTML di bawah ini sebagai body):
 
-Kepada Yth. CTO Bank Mandiri,
+Kepada Yth. CTO Bank Mandiri,<br><br>
 
-Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.
+Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.<br><br>
 
----
+---<br><br>
 
-**Cash & Trade Operations Group**
-**Bulk Payment & Account Opening Department**
-Sentra Mandiri Gedung B Lt. 4
-JL. RP Soeroso No. 2-4
-Jakarta 10330
+<b>Cash & Trade Operations Group</b><br>
+<b>Bulk Payment & Account Opening Department</b><br>
+Sentra Mandiri Gedung B Lt. 4<br>
+JL. RP Soeroso No. 2-4<br>
+Jakarta 10330<br><br>
 
----
+---<br><br>
 
-**Perihal:** : **[Permohonan Pembukaan Rekening BULK Tabungan Reguler]**
+<b>Perihal:</b> : <b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b><br><br>
 
-Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:
+Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
 
-* **Jumlah Rekening:** : **[17 Rekening (rincian terlampir)]**
-* **Jenis:** : ACTIVE
-* **Kode Tabungan:** : TABMANDIRI
+<ul>
+<li><b>Jumlah Rekening:</b> : <b>[17 Rekening (rincian terlampir)]</b></li>
+<li><b>Jenis:</b> : ACTIVE</li>
+<li><b>Kode Tabungan:</b> : TABMANDIRI</li>
+</ul><br>
 
-Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, yaitu :
+Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, yaitu :<br><br>
 
-| Field | Keterangan |
-| --- | --- |
-| NIK | Wajib 16 Digit (sesuai e-KTP) |
-| Nama | Ejaan/ spasi (sama persis dengan e-KTP) |
-| Tanggal Lahir | Tanggal Bulan dan Tahun (sama persis dengan e-KTP) |
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
+  <tr>
+    <th>Field</th>
+    <th>Keterangan</th>
+  </tr>
+  <tr>
+    <td>NIK</td>
+    <td>Wajib 16 Digit (sesuai e-KTP)</td>
+  </tr>
+  <tr>
+    <td>Nama</td>
+    <td>Ejaan/ spasi (sama persis dengan e-KTP)</td>
+  </tr>
+  <tr>
+    <td>Tanggal Lahir</td>
+    <td>Tanggal Bulan dan Tahun (sama persis dengan e-KTP)</td>
+  </tr>
+</table><br>
 
-Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.
+Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
 
 Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`;
       }
