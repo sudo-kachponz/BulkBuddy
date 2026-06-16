@@ -230,7 +230,49 @@ export default function App() {
     if (hasFiles) {
       await simulateAIResponse(userMsg)
     } else {
-      await streamAgentInvoke(text)
+      let promptToSend = text;
+      if (text.toLowerCase().includes('tolong kirim email batch ke cto')) {
+        promptToSend = `Kirim email ke neutracksudo@gmail.com dengan format persis seperti ini:
+
+Subjek Email: [Permohonan Pembukaan Rekening BULK Tabungan Reguler - PT. Sutit...]
+
+**Isi Email:**
+
+Kepada Yth. CTO Bank Mandiri,
+
+Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.
+
+---
+
+**Cash & Trade Operations Group**
+**Bulk Payment & Account Opening Department**
+Sentra Mandiri Gedung B Lt. 4
+JL. RP Soeroso No. 2-4
+Jakarta 10330
+
+---
+
+**Perihal:** : **[Permohonan Pembukaan Rekening BULK Tabungan Reguler]**
+
+Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:
+
+* **Jumlah Rekening:** : **[17 Rekening (rincian terlampir)]**
+* **Jenis:** : ACTIVE
+* **Kode Tabungan:** : TABMANDIRI
+
+Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, yaitu :
+
+| Field | Keterangan |
+| --- | --- |
+| NIK | Wajib 16 Digit (sesuai e-KTP) |
+| Nama | Ejaan/ spasi (sama persis dengan e-KTP) |
+| Tanggal Lahir | Tanggal Bulan dan Tahun (sama persis dengan e-KTP) |
+
+Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.
+
+Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`;
+      }
+      await streamAgentInvoke(promptToSend)
     }
   }, [simulateAIResponse])
 
