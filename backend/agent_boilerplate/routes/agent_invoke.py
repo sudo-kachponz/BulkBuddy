@@ -147,6 +147,23 @@ async def invoke_agent(
             
             agent_config = agent_response.data[0]
             
+            # Fetch tool details if tools are present
+            if agent_config.get("tools"):
+                tool_details = []
+                for tool_id in agent_config.get("tools", []):
+                    try:
+                        tool_response = (
+                            supabase.table("tools_with_decrypted_keys")
+                            .select("tool_id, name, description, versions")
+                            .eq("tool_id", tool_id)
+                            .execute()
+                        )
+                        if tool_response.data:
+                            tool_details.append(tool_response.data[0])
+                    except Exception as e:
+                        print(f"Error fetching tool details for {tool_id}: {str(e)}")
+                agent_config["tool_details"] = tool_details
+            
             # Check if the user has access to the agent
             has_access = False
             
@@ -327,6 +344,23 @@ async def invoke_agent_stream(
                 )
             
             agent_config = agent_response.data[0]
+            
+            # Fetch tool details if tools are present
+            if agent_config.get("tools"):
+                tool_details = []
+                for tool_id in agent_config.get("tools", []):
+                    try:
+                        tool_response = (
+                            supabase.table("tools_with_decrypted_keys")
+                            .select("tool_id, name, description, versions")
+                            .eq("tool_id", tool_id)
+                            .execute()
+                        )
+                        if tool_response.data:
+                            tool_details.append(tool_response.data[0])
+                    except Exception as e:
+                        print(f"Error fetching tool details for {tool_id}: {str(e)}")
+                agent_config["tool_details"] = tool_details
             
             # Check if the user has access to the agent
             has_access = False
