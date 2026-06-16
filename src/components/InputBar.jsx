@@ -7,20 +7,32 @@ export default function InputBar({ onSend, disabled }) {
   const fileRef = useRef(null)
 
   const addFiles = useCallback((fileList) => {
-    const newFiles = Array.from(fileList)
+    Array.from(fileList)
       .filter(f => f.type.startsWith('image/') || f.type === 'application/pdf')
-      .map(f => ({
-        file: f,
-        preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
-        name: f.name,
-      }))
-    setFiles(prev => [...prev, ...newFiles])
+      .forEach(f => {
+        if (f.type.startsWith('image/')) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            setFiles(prev => [...prev, {
+              file: f,
+              preview: e.target.result, // base64 string
+              name: f.name,
+            }])
+          }
+          reader.readAsDataURL(f)
+        } else {
+          setFiles(prev => [...prev, {
+            file: f,
+            preview: null,
+            name: f.name,
+          }])
+        }
+      })
   }, [])
 
   const removeFile = (idx) => {
     setFiles(prev => {
       const copy = [...prev]
-      if (copy[idx].preview) URL.revokeObjectURL(copy[idx].preview)
       copy.splice(idx, 1)
       return copy
     })
@@ -45,7 +57,7 @@ export default function InputBar({ onSend, disabled }) {
   const hasContent = text.trim() || files.length > 0
 
   return (
-    <div className="border-t border-slate-200/70 bg-white/80 backdrop-blur-md px-4 py-3"
+    <div className="shrink-0 border-t border-slate-200/70 bg-white/80 backdrop-blur-md px-4 py-3"
       onDragOver={e => e.preventDefault()} onDrop={handleDrop}>
       {/* Image previews strip */}
       {files.length > 0 && (

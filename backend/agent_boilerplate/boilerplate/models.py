@@ -14,6 +14,7 @@ class AgentInputMessage(BaseModel):
     messages: str
     context: str = ""
     image_path: Optional[str] = None
+    image_urls: Optional[List[str]] = None
 
 
 class AgentInputConfig(BaseModel):

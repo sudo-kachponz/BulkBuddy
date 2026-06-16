@@ -120,8 +120,14 @@ class AgentBoilerplate:
         
         return final_message, config
     
-    def _is_server_reachable(self, url: str) -> bool:
-        """Check if the MCP server is reachable."""
+    def _is_server_reachable(self, url: str, max_retries: int = 10, interval: float = 1.0) -> bool:
+        """
+        Check if the MCP server is reachable, with retry logic for cold starts.
+        
+        During startup, the MCP proxy may take several seconds to boot.
+        This method will retry the connection check up to `max_retries` times
+        with `interval` seconds between each attempt.
+        """
         try:
             from urllib.parse import urlparse
             import socket
@@ -130,13 +136,23 @@ class AgentBoilerplate:
             port = parsed.port
             
             if not port:
-                return True # Cannot check port, assume reachable or non-TCP
-                
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(0.5) # Short timeout
-            result = sock.connect_ex((host, port))
-            sock.close()
-            return result == 0
+                return True  # Cannot check port, assume reachable or non-TCP
+
+            for attempt in range(1, max_retries + 1):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1.0)
+                result = sock.connect_ex((host, port))
+                sock.close()
+                if result == 0:
+                    if attempt > 1:
+                        print(f"✅ MCP server at {url} became reachable after {attempt} attempts.")
+                    return True
+                print(f"⏳ MCP server at {url} not ready yet (attempt {attempt}/{max_retries})...")
+                import time as _time
+                _time.sleep(interval)
+            
+            print(f"❌ MCP server at {url} still unreachable after {max_retries} attempts.")
+            return False
         except Exception as e:
             print(f"Warning: Could not check server reachability: {e}")
             return False
@@ -434,6 +450,16 @@ class AgentBoilerplate:
         query, config = self.parse_agent_input(agent_input, agent_config)
         print(query, config)
 
+        # Convert query to multimodal format if images are present
+        human_message_content = query
+        if getattr(agent_input.input, 'image_urls', None):
+            human_message_content = [{"type": "text", "text": query}]
+            for img_url in agent_input.input.image_urls:
+                human_message_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": img_url}
+                })
+
         # Step 2: Handle agent memory
         memory = self.get_or_create_memory(agent_id)
         if agent_input.metadata.reset_memory:
@@ -514,8 +540,8 @@ class AgentBoilerplate:
 
 
         try:
-            # Step 7: Stream agent events
-            query_input = {"messages": [HumanMessage(content=query)]}
+            # Use astream_events for more granular streaming
+            query_input = {"messages": [HumanMessage(content=human_message_content)]}
             final_answer_content: str | None = None
 
             yield f"event: status\ndata: {json.dumps({'status': 'Processing your request'})}\n\n"

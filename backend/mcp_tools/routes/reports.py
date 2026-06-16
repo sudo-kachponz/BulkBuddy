@@ -86,19 +86,15 @@ async def generate_reports(req: ReportRequest):
     pdf.output(pdf_path)
     
     if req.send_email:
-        subject = "[Permohonan Pembukaan Rekening BULK Tabungan Reguler - PT. Sutit...]"
+        subject = "[Permohonan Pembukaan Rekening BULK Tabungan Reguler - PLN SUTET]"
         html_body = f"""
-        Kepada Yth. CTO Bank Mandiri,<br><br>
-        Berikut adalah laporan permohonan pembukaan rekening BULK Tabungan Reguler.<br><br>
-        <b>Lampiran Dokumen:</b> Terdapat di lampiran fisik email ini (PDF & Excel).<br>
-        ---<br><br>
         <b>Cash & Trade Operations Group</b><br>
         <b>Bulk Payment & Account Opening Department</b><br>
         Sentra Mandiri Gedung B Lt. 4<br>
         JL. RP Soeroso No. 2-4<br>
         Jakarta 10330<br><br>
         ---<br><br>
-        <b>Perihal:</b> : <b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b><br><br>
+        <b>Perihal:</b> : <span style="text-decoration: underline;"><b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b></span><br><br>
         Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
         <ul>
         <li><b>Jumlah Rekening:</b> : <b>[{len(data)} Rekening (rincian terlampir)]</b></li>

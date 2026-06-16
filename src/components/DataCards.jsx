@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { CheckCircle2, AlertTriangle, Download, Send, FileText, Save, Pencil, X, Check } from 'lucide-react'
 import { NASABAH_COLUMNS, PRIMARY_COLUMNS, toMCPPayload } from '../data/schema'
-import sheetsIcon from '../assets/sheets.png'
-import mailIcon from '../assets/mail.png'
+import sheetsIcon from '../assets/sheet.svg'
+import mailIcon from '../assets/mail.svg'
 
 /* ── Per-image extracted data card ── */
 export function ExtractedDataCard({ data }) {
@@ -20,11 +20,11 @@ export function ExtractedDataCard({ data }) {
 
   return (
     <div className={`rounded-2xl border p-4 transition-all duration-200 hover:shadow-md
-      ${isLow ? 'bg-amber-50/60 border-amber-200' : 'bg-white/80 border-slate-200/70'}`}>
+      ${isLow ? 'bg-amber-50/60 border-amber-200' : 'bg-[#F2F4F7] border-[#344054]/20'}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <FileText size={15} className="text-primary-500" />
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Data Nasabah</span>
+          <span className="text-xs font-bold text-[#344054] uppercase tracking-wide">Data Nasabah</span>
         </div>
         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold
           ${isLow
@@ -38,8 +38,8 @@ export function ExtractedDataCard({ data }) {
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
         {displayFields.map(([label, val]) => (
           <div key={label} className="contents">
-            <span className="text-slate-400 font-medium text-xs">{label}</span>
-            <span className={`font-semibold ${isLow && String(val).length > 16 ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-slate-800'}`}>
+            <span className="text-[#344054]/70 font-medium text-xs">{label}</span>
+            <span className={`font-semibold ${isLow && String(val).length > 16 ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-[#344054]'}`}>
               {val || '—'}
             </span>
           </div>
@@ -144,9 +144,9 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white/90 backdrop-blur-sm overflow-hidden shadow-sm">
+    <div className="rounded-2xl border border-[#344054]/20 bg-[#F2F4F7] overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-slate-100">
+      <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-[#344054]/10">
         <img src={sheetsIcon} alt="Sheets" className="w-6 h-6 object-contain" />
         <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {rows.length} Nasabah</span>
         <span className="text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
@@ -190,11 +190,10 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
               const isLowConf = row.confidence < 80
               return (
                 <tr key={row.id}
-                  className={`transition-colors ${
-                    isSaved ? 'bg-emerald-50/40' :
+                  className={`transition-colors ${isSaved ? 'bg-emerald-50/40' :
                     isLowConf ? 'bg-amber-50/30' :
-                    'hover:bg-primary-50/30'
-                  }`}>
+                      'hover:bg-primary-50/30'
+                    }`}>
                   <td className="px-3 py-2 text-slate-400 font-medium text-xs sticky left-0 bg-white/95 z-10 border-r border-slate-100">
                     <div className="flex items-center gap-1.5">
                       <span>{i + 1}</span>

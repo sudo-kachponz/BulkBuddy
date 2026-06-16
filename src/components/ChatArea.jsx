@@ -2,6 +2,16 @@ import { useRef, useEffect } from 'react'
 import { Bot, User } from 'lucide-react'
 import { ExtractedDataCard, SpreadsheetTable } from './DataCards'
 
+/* ── Text Renderer Helper ── */
+function renderMarkdownHTML(text) {
+  let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // **text** -> heading (larger)
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="text-[1.05rem] font-bold text-slate-800">$1</span>');
+  // *text* -> bold
+  html = html.replace(/\*([^*]+)\*/g, '<span class="font-bold">$1</span>');
+  return { __html: html };
+}
+
 /* ── Typing Indicator ── */
 function TypingIndicator() {
   return (
@@ -54,18 +64,30 @@ function UserBubble({ message }) {
 }
 
 /* ── AI Message Bubble ── */
-function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend }) {
+function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet }) {
+  const spreadsheetOptions = [];
+  if (message.text && message.text.toLowerCase().includes('pilih spreadsheet mana yang ingin digunakan')) {
+    const lines = message.text.split('\n');
+    for (const line of lines) {
+      const match = line.match(/^\d+\.\s+(.+)$/);
+      if (match) {
+        spreadsheetOptions.push(match[1].trim());
+      }
+    }
+  }
+
   return (
-    <div className="flex items-start gap-3 msg-enter">
+    <div className="flex items-start gap-3 msg-enter w-full">
       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shrink-0 shadow-sm">
         <Bot size={16} className="text-white" />
       </div>
-      <div className="max-w-[80%] space-y-3">
+      <div className="flex-1 min-w-0 max-w-full lg:max-w-[85%] space-y-3">
         {/* Text content */}
         {message.text && (
-          <div className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line">
-            {message.text}
-          </div>
+          <div 
+            className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line"
+            dangerouslySetInnerHTML={renderMarkdownHTML(message.text)}
+          />
         )}
 
         {/* Confirmation Button */}
@@ -77,6 +99,22 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
             >
               <span>✅ Ya, Download & Kirim ke CTO</span>
             </button>
+          </div>
+        )}
+
+        {/* Spreadsheet Selection Buttons */}
+        {spreadsheetOptions.length > 0 && (
+          <div className="flex flex-col gap-2 mt-3">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-1">Pilih Spreadsheet:</span>
+            {spreadsheetOptions.map((opt, idx) => (
+              <button
+                key={idx}
+                onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt)}
+                className="text-left px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+              >
+                📄 {opt}
+              </button>
+            ))}
           </div>
         )}
 
@@ -104,7 +142,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
 }
 
 /* ── Main Chat Area ── */
-export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend }) {
+export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -112,14 +150,16 @@ export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, o
   }, [messages, isTyping])
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-5 chat-scroll">
-      {messages.map((msg, i) => (
-        msg.role === 'user'
-          ? <UserBubble key={i} message={msg} />
-          : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} onConfirmSend={onConfirmSend} />
-      ))}
-      {isTyping && <TypingIndicator />}
-      <div ref={bottomRef} />
+    <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-8 chat-scroll">
+      <div className="max-w-4xl mx-auto space-y-6 w-full">
+        {messages.map((msg, i) => (
+          msg.role === 'user'
+            ? <UserBubble key={i} message={msg} />
+            : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} onConfirmSend={onConfirmSend} onNewSheet={onNewSheet} onExistingSheet={onExistingSheet} onSelectExistingSheet={onSelectExistingSheet} />
+        ))}
+        {isTyping && <TypingIndicator />}
+        <div ref={bottomRef} />
+      </div>
     </div>
   )
 }

@@ -1,13 +1,13 @@
-import { MessageSquarePlus, Clock, Rocket, ChevronLeft, ChevronRight } from 'lucide-react'
-import { MOCK_HISTORY } from '../data/mockData'
+import { MessageSquarePlus, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import logoIcon from '../assets/logo.svg'
 
-export default function Sidebar({ collapsed, onToggle, onNewChat }) {
+export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat }) {
   return (
     <aside className={`relative flex flex-col bg-white/90 backdrop-blur-md border-r border-slate-200/70 transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-72'}`}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4">
-        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-primary-600 to-primary-400 flex items-center justify-center shadow-lg shadow-primary-500/20 shrink-0">
-          <Rocket size={18} className="text-white" />
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm shrink-0">
+          <img src={logoIcon} alt="Logo" className="w-8 h-8" />
         </div>
         {!collapsed && <span className="text-lg font-bold text-primary-800 tracking-tight truncate">BulkBuddy</span>}
       </div>
@@ -24,13 +24,13 @@ export default function Sidebar({ collapsed, onToggle, onNewChat }) {
         </button>
       </div>
 
-      {/* History */}
+    {/* History */}
       {!collapsed && (
         <div className="flex-1 overflow-y-auto px-3 chat-scroll">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-2 mb-2">Riwayat</p>
           <div className="space-y-1">
-            {MOCK_HISTORY.map(chat => (
-              <button key={chat.id}
+            {historyData.map(chat => (
+              <button key={chat.id} onClick={() => onSelectChat && onSelectChat(chat)}
                 className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-primary-50 transition-colors duration-150 group cursor-pointer">
                 <p className="text-sm font-medium text-slate-700 truncate group-hover:text-primary-700">{chat.title}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">

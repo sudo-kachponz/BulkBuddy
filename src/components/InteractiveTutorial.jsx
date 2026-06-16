@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Sparkles, Camera, CheckCircle2 } from 'lucide-react'
-import sheetsIcon from '../assets/sheets.png'
-import mailIcon from '../assets/mail.png'
+import sheetsIcon from '../assets/sheet.svg'
+import mailIcon from '../assets/mail.svg'
+import logoIcon from '../assets/logo.svg'
 
 const STEPS = [
   {
@@ -87,10 +88,10 @@ export default function InteractiveTutorial({ onQuickAction }) {
     <div className="flex flex-col items-center justify-center flex-1 px-6 py-8 fade-in overflow-y-auto">
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary-500 to-blue-400 flex items-center justify-center shadow-xl shadow-primary-500/20 mb-4">
-          <Sparkles size={28} className="text-white" />
+        <div className="w-28 h-28 mb-5 rounded-[25px] overflow-hidden border-2 border-[#1AC1DD]/30 shadow-[0_8px_30px_-5px_rgba(26,193,221,0.6)] bg-white">
+          <img src={logoIcon} alt="BulkBuddy Logo" className="w-full h-full object-cover" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-1 text-center">BulkBuddy, asisten AI pembuka rekening!</h2>
+        <h2 className="text-2xl font-bold text-slate-800 mb-1 text-center">BulkBuddy, Asisten Pembuka Rekening</h2>
         <p className="text-sm text-slate-400 text-center max-w-sm">Ikuti langkah-langkah di bawah untuk memproses batch pembukaan rekening nasabah</p>
 
         {/* Progress bar */}
