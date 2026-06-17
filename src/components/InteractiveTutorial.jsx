@@ -83,12 +83,6 @@ const SLIDES = [
   },
 ]
 
-const QUICK_ACTIONS = [
-  { label: '🆕 Input Nasabah Baru', msg: 'Saya ingin input data nasabah baru dari form fisik.' },
-  { label: '🗑️ Hapus Data Nasabah', msg: 'Saya ingin menghapus data nasabah.' },
-  { label: '📋 Cek Status Batch', msg: 'Tolong cek status batch input terakhir.' },
-]
-
 /* ── Animated counter for progress bar ── */
 function usePrevious(value) {
   const [prev, setPrev] = useState(value)
@@ -288,21 +282,6 @@ export default function InteractiveTutorial({ onQuickAction }) {
         <p className="text-[11px] text-slate-400 font-medium">
           {current + 1} dari {SLIDES.length} langkah
         </p>
-      </div>
-
-      {/* ── Quick Actions ── */}
-      <div className="mt-5 flex flex-wrap justify-center gap-2.5">
-        {QUICK_ACTIONS.map((a) => (
-          <button
-            key={a.label}
-            onClick={() => onQuickAction(a.msg)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm
-              text-sm font-medium text-slate-700 hover:bg-[#1AC1DD]/5 hover:border-[#1AC1DD]/40 hover:text-[#1AC1DD]
-              hover:shadow-md active:scale-[0.97] transition-all duration-200 cursor-pointer"
-          >
-            {a.label}
-          </button>
-        ))}
       </div>
     </div>
   )
