@@ -13,6 +13,7 @@ from agent_boilerplate.routes.agent_invoke import router as agent_invoke_router
 from agent_boilerplate.routes.agent_api import router as agent_api_router
 from mcp_tools.routes.mcp_tools import router as mcp_tools_router, refresh_tools
 from mcp_tools.routes.reports import router as reports_router
+from mcp_tools.routes.chat_history import router as chat_history_router
 
 # Load environment variables from the project root .env
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
@@ -101,6 +102,7 @@ app.include_router(agent_invoke_router)
 app.include_router(agent_api_router)
 app.include_router(mcp_tools_router)
 app.include_router(reports_router)
+app.include_router(chat_history_router)
 
 @app.get("/")
 def read_root():

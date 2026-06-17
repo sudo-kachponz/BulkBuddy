@@ -95,7 +95,7 @@ async def generate_reports(req: ReportRequest):
         Jakarta 10330<br><br>
         ---<br><br>
         <b>Perihal:</b> : <span style="text-decoration: underline;"><b>[Permohonan Pembukaan Rekening BULK Tabungan Reguler]</b></span><br><br>
-        Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara [PT Suter...] dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
+        Sehubungan dengan diadakannya kerjasama pembukaan Tabungan Reguler antara PT Sutet... dengan Bank Mandiri Tanjung Priok Enggano (12000), dengan ini kami sampaikan permintaan pembukaan rekening secara bulk untuk dapat diproses sesuai informasi sebagai berikut:<br><br>
         <ul>
         <li><b>Jumlah Rekening:</b> : <b>[{len(data)} Rekening (rincian terlampir)]</b></li>
         <li><b>Jenis:</b> : ACTIVE</li>

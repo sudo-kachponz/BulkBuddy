@@ -5,10 +5,12 @@ import { ExtractedDataCard, SpreadsheetTable } from './DataCards'
 /* ── Text Renderer Helper ── */
 function renderMarkdownHTML(text) {
   let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // **text** -> heading (larger)
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="text-[1.05rem] font-bold text-slate-800">$1</span>');
+  // ### text -> heading
+  html = html.replace(/###\s*(.+)/g, '<h3 class="text-lg font-bold text-slate-800 mt-2 mb-1">$1</h3>');
+  // **text** -> bold same size
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<span class="font-bold text-slate-800">$1</span>');
   // *text* -> bold
-  html = html.replace(/\*([^*]+)\*/g, '<span class="font-bold">$1</span>');
+  html = html.replace(/\*([^*]+)\*/g, '<span class="font-bold text-slate-800">$1</span>');
   return { __html: html };
 }
 
@@ -111,15 +113,14 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
                 key={idx}
                 onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt)}
                 className="text-left px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
-              >
-                📄 {opt}
-              </button>
+                dangerouslySetInnerHTML={renderMarkdownHTML(`📄 ${opt}`)}
+              />
             ))}
           </div>
         )}
 
-        {/* Data cards */}
-        {message.dataCards && message.dataCards.length > 0 && (
+        {/* Data cards (only show if it is an OCR task) */}
+        {message.dataCards && message.dataCards.length > 0 && message.isOcr && (
           <div className="space-y-2">
             {message.dataCards.map((card, i) => (
               <ExtractedDataCard key={i} data={card} />

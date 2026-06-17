@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import ChatArea from './components/ChatArea'
 import InputBar from './components/InputBar'
@@ -7,6 +7,7 @@ import { MOCK_NASABAH, QUICK_ACTIONS } from './data/mockData'
 import mandiriLogo from './assets/bankmandiri_light.png'
 import mailIcon from './assets/mail.svg'
 import sheetIcon from './assets/sheet.svg'
+import { useChatHistory } from './hooks/useChatHistory'
 
 /* ── Helper: simulate AI delay ── */
 const delay = (ms) => new Promise(r => setTimeout(r, ms))
@@ -38,23 +39,55 @@ export default function App() {
   
   // Global table state
   const [workingData, setWorkingData] = useState([])
+  const [activeSheetName, setActiveSheetName] = useState(null)
   
-  // Chat History state
-  const [chatHistory, setChatHistory] = useState(() => {
-    const saved = localStorage.getItem('bulkbuddy_history')
-    return saved ? JSON.parse(saved) : []
-  })
+  // Chat History via custom hook
+  const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
+  const [activeSession, setActiveSession] = useState(null)
+
+  // Load sidebar sessions on mount
+  useEffect(() => {
+    loadSessions()
+  }, [loadSessions])
+
+  // Helper to persist current UI state to backend
+  const saveCurrentStateToBackend = async (newMessages, newWorkingData) => {
+    if (activeSession) {
+      await updateSession(activeSession.id, {
+        messages: newMessages,
+        workingData: newWorkingData
+      })
+    } else {
+      const sess = await createSession({
+        messages: newMessages,
+        workingData: newWorkingData,
+        thread_id: crypto.randomUUID() // fresh thread per session
+      })
+      if (sess) setActiveSession(sess)
+    }
+  }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
 
-
   /* ── Stream Agent Invoke ── */
   const streamAgentInvoke = async (promptText, images = [], actionType = 'chat') => {
     setIsTyping(true)
     let aiMessageIndex = -1
+    
+    // Auto-create session if none active
+    let currentSession = activeSession
+    if (!currentSession) {
+       currentSession = await createSession({
+         messages: [...messages, { role: 'user', text: promptText }],
+         workingData: workingData,
+         thread_id: crypto.randomUUID()
+       })
+       setActiveSession(currentSession)
+    }
+    const thread_id = currentSession ? currentSession.thread_id : "1"
 
     try {
       const response = await fetch("http://localhost:8000/agent-invoke/fff649af-1f16-4027-9371-76a4d587096b/invoke-stream", {
@@ -71,7 +104,7 @@ export default function App() {
           },
           config: {
             configurable: {
-              thread_id: "1"
+              thread_id: thread_id
             }
           },
           metadata: {
@@ -94,10 +127,12 @@ export default function App() {
       let currentEvent = ""
 
       setMessages(prev => {
-        const newMessages = [...prev, { role: 'ai', text: 'Menghubungkan ke Agent...' }]
+        const newMessages = [...prev, { role: 'ai', text: 'Menghubungkan ke Agent...', isOcr: actionType === 'Input Form Fisik' }]
         aiMessageIndex = newMessages.length - 1
         return newMessages
       })
+
+      let finalSpreadsheetData = null
 
       while (true) {
         const { value, done } = await reader.read()
@@ -124,11 +159,8 @@ export default function App() {
             }
             
             // SUPER AGGRESSIVE MARKDOWN TABLE REMOVER:
-            // Hapus baris tabel (| Field | Value |)
             processed = processed.replace(/^\|.*\|$/gm, '');
-            // Hapus separator tabel (|---|---|)
             processed = processed.replace(/^[-|:\s]+$/gm, '');
-            // Hapus intro tabel (Data yang tersimpan:) jika tidak ada json
             processed = processed.replace(/Data yang tersimpan:/g, '');
 
             return processed.trim();
@@ -161,6 +193,7 @@ export default function App() {
                     for (const obj of objectMatches) {
                       try { spreadsheetData.push(JSON.parse(obj)); } catch (e) { }
                     }
+                    finalSpreadsheetData = spreadsheetData
                   }
                 }
 
@@ -169,9 +202,8 @@ export default function App() {
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
                     updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
-                      // Live render combines previous workingData with new incoming stream data
                       updated[aiMessageIndex].spreadsheet = [...workingData, ...spreadsheetData];
-                      updated[aiMessageIndex].dataCards = spreadsheetData; // Only show cards for new data
+                      updated[aiMessageIndex].dataCards = spreadsheetData;
                     }
                   }
                   return updated
@@ -212,17 +244,14 @@ export default function App() {
       }
 
       // Post-stream actions
-      // Extract the final spreadsheet data and merge into global workingData
       setMessages(prev => {
-        const lastMsg = prev[aiMessageIndex]
-        if (lastMsg && lastMsg.dataCards) {
-           setWorkingData(wd => {
-              // Create a unique array based on ID to prevent extreme dupes, though the user said it should append. 
-              // The user said: "jika 3 atau lebih foto itupun datanya sama smeua, tetap harusupdate" (append).
-              // Let's just append.
-              return [...wd, ...lastMsg.dataCards]
-           })
+        let finalWorkingData = workingData
+        if (finalSpreadsheetData) {
+           finalWorkingData = [...workingData, ...finalSpreadsheetData]
+           setWorkingData(finalWorkingData)
         }
+        // Save state to backend
+        saveCurrentStateToBackend(prev, finalWorkingData)
         return prev
       })
 
@@ -242,6 +271,7 @@ export default function App() {
         if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
           updated[aiMessageIndex].text = `❌ Terjadi kesalahan: ${error.message}`
         }
+        saveCurrentStateToBackend(updated, workingData)
         return updated
       })
     } finally {
@@ -252,7 +282,11 @@ export default function App() {
   /* ── Handle user sending message ── */
   const handleSend = useCallback(async ({ text, files, previews }) => {
     const userMsg = { role: 'user', text, files, previews }
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => {
+      const newMsg = [...prev, userMsg]
+      saveCurrentStateToBackend(newMsg, workingData)
+      return newMsg
+    })
 
     const hasFiles = files && files.length > 0
     let promptToSend = text;
@@ -323,7 +357,7 @@ Data dimaksud telah kami periksa dan diyakini kebenarannya telah sesuai e-KTP, y
   </tr>
 </table><br>
 
-Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yangহিংস yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
+Apabila terdapat kesalahan data (tidak sesuai e-KTP), segala risiko dan akibat yang timbul setelahnya akan menjadi tanggung jawab kami.<br><br>
 
 Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.`;
       } else if (text.toLowerCase().includes('saya ingin input data nasabah baru dari form fisik')) {
@@ -341,7 +375,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
       }
       await streamAgentInvoke(promptToSend, [])
     }
-  }, [])
+  }, [messages, workingData, activeSession])
 
   /* ── Quick action = auto-send ── */
   const handleQuickAction = useCallback((message) => {
@@ -358,34 +392,29 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   }, [handleSend])
 
   const handleSelectExistingSheet = useCallback((sheetName) => {
-    handleSend({ text: `Tolong gunakan spreadsheet ini: ${sheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`, files: [], previews: [] })
+    const cleanSheetName = sheetName.replace(/\*/g, '').trim()
+    setActiveSheetName(cleanSheetName)
+    handleSend({ text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`, files: [], previews: [] })
   }, [handleSend])
 
   /* ── New chat ── */
   const handleNewChat = () => {
-    if (messages.length > 0) {
-      const newHistoryItem = {
-        id: Date.now().toString(),
-        title: messages[0].text ? messages[0].text.substring(0, 30) + '...' : 'Data Nasabah Baru',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        preview: messages.length > 1 ? 'Laporan berhasil.' : 'Upload sukses.',
-        messages: [...messages],
-        workingData: [...workingData]
-      }
-      const updatedHistory = [newHistoryItem, ...chatHistory]
-      setChatHistory(updatedHistory)
-      localStorage.setItem('bulkbuddy_history', JSON.stringify(updatedHistory))
-    }
-    
     setMessages([])
     setWorkingData([])
+    setActiveSession(null)
+    setActiveSheetName(null)
     setIsTyping(false)
   }
 
   /* ── Load chat from history ── */
-  const handleSelectChat = (chatItem) => {
-    setMessages(chatItem.messages || [])
-    setWorkingData(chatItem.workingData || [])
+  const handleSelectChat = async (chatItem) => {
+    // We already have some metadata in sidebar, but we need full session for messages
+    const fullSession = await getSession(chatItem.id)
+    if (fullSession) {
+      setActiveSession(fullSession)
+      setMessages(fullSession.messages || [])
+      setWorkingData(fullSession.working_data || [])
+    }
   }
 
   /* ── Export PDF (mock) ── */
@@ -397,9 +426,10 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   const handleConfirmSend = async (rows) => {
     showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
 
-    // Tambahkan user bubble biasa agar rapi
     const userMsg = { role: 'user', text: 'Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
-    setMessages(prev => [...prev, userMsg])
+    const newMsgs = [...messages, userMsg]
+    setMessages(newMsgs)
+    saveCurrentStateToBackend(newMsgs, workingData)
 
     try {
       const response = await fetch('http://localhost:8000/api/generate-reports', {
@@ -438,13 +468,19 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   /* ── Save to Sheet via MCP ── */
   const handleSaveToSheet = async (updatedData) => {
     const dataString = JSON.stringify(updatedData, null, 2)
-    const prompt = `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
+    const prompt = activeSheetName
+      ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. SANGAT PENTING: JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
+      : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
 
     // Add user intent message to the chat first
-    setMessages(prev => [...prev, {
-      role: 'user',
-      text: 'Simpan data nasabah ini ke Google Sheets'
-    }])
+    setMessages(prev => {
+      const newMsg = [...prev, {
+        role: 'user',
+        text: 'Simpan data nasabah ini ke Google Sheets'
+      }]
+      saveCurrentStateToBackend(newMsg, workingData)
+      return newMsg
+    })
 
     await streamAgentInvoke(prompt, [], 'Simpan ke Sheets')
   }
@@ -465,7 +501,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(c => !c)}
         onNewChat={handleNewChat}
-        historyData={chatHistory}
+        historyData={sessions}
         onSelectChat={handleSelectChat}
       />
 

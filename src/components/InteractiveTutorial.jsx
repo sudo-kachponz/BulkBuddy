@@ -1,241 +1,305 @@
-import { useState } from 'react'
-import { Sparkles, Camera, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import step1Img from '../assets/step1.svg'
+import step2Img from '../assets/step2.svg'
+import step3Img from '../assets/step3.svg'
+import step4Img from '../assets/step4.svg'
 import sheetsIcon from '../assets/sheet.svg'
 import mailIcon from '../assets/mail.svg'
 import logoIcon from '../assets/logo.svg'
 
-const STEPS = [
+/* ── Slide Data ── */
+const SLIDES = [
   {
     id: 1,
-    icon: <Camera size={22} className="text-slate-600" />,
-    iconBg: 'bg-white border border-slate-200',
-    label: 'Upload Foto Form',
-    desc: 'Foto / scan form fisik nasabah (JPEG, PNG, atau PDF)',
-    actionLabel: null,
-    actionIcon: null,
-    color: 'white',
+    step: 'Step 1',
+    title: 'Upload Foto Form Fisik',
+    subtitle: 'Ambil & lampirkan dokumen nasabah',
+    description: 'Foto atau scan formulir fisik nasabah (KYC). OCR AI akan otomatis membaca NIK, Nama, Tanggal Lahir, Ibu Kandung, dan data lainnya.',
+    bullets: [
+      'Format: JPG, PNG, atau PDF scan',
+      'AI membaca formulir secara otomatis',
+      'Field yang dibaca: NIK, Nama, Tgl Lahir, Ibu Kandung',
+    ],
+    illustration: step1Img,
+    accent: '#1AC1DD',
+    accentLight: 'rgba(26,193,221,0.08)',
+    pill: 'Upload',
+    pillColor: '#1AC1DD',
+    action: null,
   },
   {
     id: 2,
-    icon: null, // will use image
-    iconImg: sheetsIcon,
-    iconBg: 'bg-white border border-slate-200',
-    label: 'Input ke Google Sheets',
-    desc: 'OCR otomatis membaca form & memasukkan data ke spreadsheet',
-    actionLabel: 'Buka Sheets',
-    actionImg: sheetsIcon,
-    color: 'white',
+    step: 'Step 2',
+    title: 'Input ke Google Sheets',
+    subtitle: 'Data otomatis masuk spreadsheet',
+    description: 'Setelah OCR selesai, AI akan langsung memasukkan data terstruktur ke Google Sheets via MCP. Setiap field terverifikasi dengan confidence score.',
+    bullets: [
+      'Ekstraksi data otomatis via AI',
+      'Disimpan ke Google Sheets via MCP',
+      'Confidence score untuk setiap field',
+    ],
+    illustration: step2Img,
+    accent: '#10B981',
+    accentLight: 'rgba(16,185,129,0.08)',
+    pill: 'Sheets',
+    pillColor: '#10B981',
+    action: { label: 'Mulai Input Data', msg: 'Saya ingin input data nasabah baru dari form fisik.' },
   },
   {
     id: 3,
-    icon: <span className="text-xl">🤖</span>,
-    iconBg: 'bg-white border border-slate-200',
-    label: 'Review & Edit via Chat',
-    desc: 'AI menampilkan spreadsheet di chat. Klik sel untuk koreksi data langsung.',
-    actionLabel: null,
-    actionIcon: null,
-    color: 'white',
+    step: 'Step 3',
+    title: 'Review & Edit via Chat',
+    subtitle: 'Koreksi data langsung di chat',
+    description: 'Spreadsheet interaktif muncul di chat. Klik sel mana saja untuk mengedit data secara langsung. AI secara otomatis mengirim koreksi ke Sheets via MCP.',
+    bullets: [
+      'Spreadsheet interaktif muncul di chat',
+      'Klik sel untuk mengedit secara langsung',
+      'Koreksi otomatis dikirim via MCP ke Sheets',
+    ],
+    illustration: step3Img,
+    accent: '#6366F1',
+    accentLight: 'rgba(99,102,241,0.08)',
+    pill: 'Review',
+    pillColor: '#6366F1',
+    action: null,
   },
   {
     id: 4,
-    icon: null,
-    iconImg: mailIcon,
-    iconBg: 'bg-white border border-slate-200',
-    label: 'Kirim Email ke CTO',
-    desc: 'Setelah OK, kirim batch ke CTO via Gmail MCP untuk pembukaan rekening',
-    actionLabel: 'Kirim Email',
-    actionImg: mailIcon,
-    color: 'white',
+    step: 'Step 4',
+    title: 'Kirim Email ke CTO',
+    subtitle: 'Laporan batch siap dikirim',
+    description: 'Setelah data diverifikasi, klik tombol untuk mengirim laporan batch nasabah ke CTO melalui Gmail MCP, beserta lampiran PDF dan Excel.',
+    bullets: [
+      'Email laporan dikirim via Gmail MCP',
+      'Penerima: CTO di cto@bankmandiri.co.id',
+      'Attachment: PDF & Excel batch nasabah',
+    ],
+    illustration: step4Img,
+    accent: '#F59E0B',
+    accentLight: 'rgba(245,158,11,0.08)',
+    pill: 'Kirim',
+    pillColor: '#F59E0B',
+    action: { label: 'Kirim Email ke CTO', msg: 'Tolong kirim email batch ke CTO untuk pembukaan rekening.' },
   },
 ]
 
-const COLOR_MAP = {
-  white: {
-    ring: 'ring-slate-200',
-    bg: 'bg-white',
-    border: 'border-slate-200',
-    pill: 'bg-white text-slate-700',
-    glow: 'shadow-sm',
-    connector: 'bg-slate-200',
-    activeBorder: 'border-slate-300',
-    activeBg: 'bg-slate-50',
-  },
+const QUICK_ACTIONS = [
+  { label: '🆕 Input Nasabah Baru', msg: 'Saya ingin input data nasabah baru dari form fisik.' },
+  { label: '🗑️ Hapus Data Nasabah', msg: 'Saya ingin menghapus data nasabah.' },
+  { label: '📋 Cek Status Batch', msg: 'Tolong cek status batch input terakhir.' },
+]
+
+/* ── Animated counter for progress bar ── */
+function usePrevious(value) {
+  const [prev, setPrev] = useState(value)
+  useEffect(() => { setPrev(value) }, [value])
+  return prev
 }
 
 export default function InteractiveTutorial({ onQuickAction }) {
-  const [activeStep, setActiveStep] = useState(null)
-  const [completedSteps, setCompletedSteps] = useState([])
+  const [current, setCurrent] = useState(0)
+  const [animDir, setAnimDir] = useState('next') // 'next' | 'prev'
+  const [isAnimating, setIsAnimating] = useState(false)
 
-  const handleStepClick = (stepId) => {
-    setActiveStep(prev => prev === stepId ? null : stepId)
+  const goTo = useCallback((idx, dir = 'next') => {
+    if (isAnimating || idx === current) return
+    setAnimDir(dir)
+    setIsAnimating(true)
+    setTimeout(() => {
+      setCurrent(idx)
+      setIsAnimating(false)
+    }, 350)
+  }, [isAnimating, current])
+
+  const goNext = () => {
+    if (current < SLIDES.length - 1) goTo(current + 1, 'next')
   }
 
-  const handleActionClick = (step, e) => {
-    e.stopPropagation()
-    if (!completedSteps.includes(step.id)) {
-      setCompletedSteps(prev => [...prev, step.id])
-    }
-    if (step.id === 2) {
-      onQuickAction('Saya ingin input data nasabah baru dari form fisik.')
-    } else if (step.id === 4) {
-      onQuickAction('Tolong kirim email batch ke CTO untuk pembukaan rekening.')
-    }
+  const goPrev = () => {
+    if (current > 0) goTo(current - 1, 'prev')
   }
 
-  const progressPct = Math.round((completedSteps.length / STEPS.length) * 100)
+  /* Keyboard navigation */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') goNext()
+      if (e.key === 'ArrowLeft') goPrev()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [current, isAnimating])
+
+  const slide = SLIDES[current]
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 px-6 py-8 fade-in overflow-y-auto">
-      {/* Header */}
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-28 h-28 mb-5 rounded-[25px] overflow-hidden border-2 border-[#1AC1DD]/30 shadow-[0_8px_30px_-5px_rgba(26,193,221,0.6)] bg-white">
+    <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-0 px-4 py-2 fade-in">
+      {/* ── Header ── */}
+      <div className="flex flex-col items-center mb-5">
+        <div
+          className="w-20 h-20 mb-3 rounded-[20px] overflow-hidden border-2 shadow-lg bg-white"
+          style={{ borderColor: 'rgba(26,193,221,0.4)', boxShadow: '0 6px 24px rgba(26,193,221,0.4)' }}
+        >
           <img src={logoIcon} alt="BulkBuddy Logo" className="w-full h-full object-cover" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-1 text-center">BulkBuddy, Asisten Pembuka Rekening</h2>
-        <p className="text-sm text-slate-400 text-center max-w-sm">Ikuti langkah-langkah di bawah untuk memproses batch pembukaan rekening nasabah</p>
+        <h2 className="text-xl font-bold text-slate-800 text-center leading-tight">
+          BulkBuddy — Asisten Pembuka Rekening
+        </h2>
+        <p className="text-xs text-slate-400 text-center mt-1 max-w-xs">
+          Ikuti 4 langkah di bawah untuk memproses batch pembukaan rekening nasabah
+        </p>
+      </div>
 
-        {/* Progress bar */}
-        <div className="mt-5 w-72">
-          <div className="flex justify-between items-center mb-1.5">
-            <span className="text-xs text-slate-400 font-medium">Progress</span>
-            <span className="text-xs font-bold text-primary-600">{completedSteps.length}/{STEPS.length} selesai</span>
+      {/* ── Slide Card ── */}
+      <div
+        className="w-full rounded-3xl border overflow-hidden flex flex-col md:flex-row"
+        style={{
+          background: '#fff',
+          borderColor: `${slide.accent}30`,
+          boxShadow: `0 8px 40px ${slide.accent}18`,
+          minHeight: 340,
+          transition: 'box-shadow 0.4s, border-color 0.4s',
+        }}
+      >
+        {/* Left — Illustration */}
+        <div
+          className="flex-shrink-0 flex items-center justify-center md:w-[340px] w-full p-6 relative"
+          style={{ background: slide.accentLight, minHeight: 220 }}
+        >
+          {/* Step badge */}
+          <div
+            className="absolute top-4 left-4 text-[11px] font-bold px-3 py-1 rounded-full shadow"
+            style={{ background: slide.accent, color: '#fff', letterSpacing: '0.04em' }}
+          >
+            {slide.step}
           </div>
-          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-primary-500 to-blue-400 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${progressPct}%` }}
-            />
+
+          <img
+            key={current}
+            src={slide.illustration}
+            alt={slide.title}
+            className={`w-full max-w-[260px] h-auto object-contain select-none transition-all duration-350
+              ${isAnimating
+                ? animDir === 'next'
+                  ? 'translate-x-8 opacity-0'
+                  : '-translate-x-8 opacity-0'
+                : 'translate-x-0 opacity-100'
+              }`}
+            style={{ transition: 'opacity 0.35s, transform 0.35s' }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Right — Content */}
+        <div
+          className={`flex-1 flex flex-col justify-between p-7 transition-all duration-350
+            ${isAnimating ? 'opacity-0 translate-x-3' : 'opacity-100 translate-x-0'}`}
+          style={{ transition: 'opacity 0.35s, transform 0.35s' }}
+        >
+          {/* Title block */}
+          <div>
+            <span
+              className="text-[11px] font-semibold uppercase tracking-widest"
+              style={{ color: slide.accent }}
+            >
+              {slide.pill}
+            </span>
+            <h3 className="text-2xl font-extrabold text-slate-800 mt-1 leading-tight">
+              {slide.title}
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">{slide.subtitle}</p>
+            <p className="text-sm text-slate-600 mt-3 leading-relaxed">{slide.description}</p>
+
+            {/* Bullet points */}
+            <ul className="mt-4 space-y-2">
+              {slide.bullets.map((b, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                  <span
+                    className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5"
+                    style={{ background: `${slide.accent}22`, color: slide.accent }}
+                  >
+                    {i + 1}
+                  </span>
+                  {b}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Bottom — Nav + Action */}
+          <div className="flex items-center justify-between mt-6 flex-wrap gap-3">
+            {/* Prev / Next */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goPrev}
+                disabled={current === 0 || isAnimating}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm font-bold transition-all duration-200
+                  ${current === 0 ? 'opacity-30 cursor-not-allowed border-slate-200 text-slate-300' : 'border-slate-300 text-slate-600 hover:bg-slate-100 hover:scale-105'}`}
+              >
+                ‹
+              </button>
+              <button
+                onClick={goNext}
+                disabled={current === SLIDES.length - 1 || isAnimating}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm font-bold transition-all duration-200
+                  ${current === SLIDES.length - 1 ? 'opacity-30 cursor-not-allowed border-slate-200 text-slate-300' : 'border-slate-300 text-slate-600 hover:bg-slate-100 hover:scale-105'}`}
+              >
+                ›
+              </button>
+            </div>
+
+            {/* Action button */}
+            {slide.action && (
+              <button
+                onClick={() => onQuickAction(slide.action.msg)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
+              >
+                {slide.id === 2 && <img src={sheetsIcon} alt="" className="w-4 h-4 object-contain" />}
+                {slide.id === 4 && <img src={mailIcon} alt="" className="w-4 h-4 object-contain" />}
+                {slide.action.label}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Steps */}
-      <div className="w-full max-w-2xl space-y-3">
-        {STEPS.map((step, idx) => {
-          const c = COLOR_MAP[step.color]
-          const isActive = activeStep === step.id
-          const isDone = completedSteps.includes(step.id)
+      {/* ── Dot indicators + step progress ── */}
+      <div className="flex flex-col items-center gap-3 mt-5">
+        {/* Dots */}
+        <div className="flex items-center gap-2">
+          {SLIDES.map((s, i) => (
+            <button
+              key={s.id}
+              onClick={() => goTo(i, i > current ? 'next' : 'prev')}
+              aria-label={`Pergi ke ${s.title}`}
+              className="transition-all duration-300"
+              style={{
+                width: i === current ? 28 : 8,
+                height: 8,
+                borderRadius: 9999,
+                background: i === current ? slide.accent : '#CBD5E1',
+                opacity: isAnimating && i !== current ? 0.6 : 1,
+              }}
+            />
+          ))}
+        </div>
 
-          return (
-            <div key={step.id}>
-              {/* Step card */}
-              <button
-                onClick={() => handleStepClick(step.id)}
-                className={`w-full text-left rounded-2xl border-2 transition-all duration-300 cursor-pointer group
-                  ${isDone
-                    ? 'border-emerald-300 bg-emerald-50/60 shadow-md shadow-emerald-500/10'
-                    : isActive
-                      ? `${c.activeBorder} ${c.activeBg} shadow-lg ${c.glow}`
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
-                  }`}
-              >
-                <div className="flex items-center gap-4 px-5 py-4">
-                  {/* Step number / done indicator */}
-                  <div className="relative shrink-0">
-                    {isDone ? (
-                      <div className="w-11 h-11 rounded-2xl bg-emerald-100 flex items-center justify-center">
-                        <CheckCircle2 size={22} className="text-emerald-500" />
-                      </div>
-                    ) : (
-                      <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${step.iconBg} flex items-center justify-center shadow-md ${c.glow}`}>
-                        {step.iconImg
-                          ? <img src={step.iconImg} alt="" className="w-8 h-8 object-contain" />
-                          : step.icon
-                        }
-                      </div>
-                    )}
-                    <span className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center
-                      ${isDone ? 'bg-emerald-500 text-white' : `${c.pill}`}`}>
-                      {step.id}
-                    </span>
-                  </div>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-bold text-sm ${isDone ? 'text-emerald-700 line-through decoration-emerald-400/50' : 'text-slate-800'}`}>
-                      {step.label}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{step.desc}</p>
-                  </div>
-
-                  {/* Action button */}
-                  {step.actionLabel && !isDone && (
-                    <button
-                      onClick={(e) => handleActionClick(step, e)}
-                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold
-                        border-2 ${c.border} ${c.bg} ${c.pill.replace('text-', 'text-')}
-                        hover:scale-[1.04] active:scale-[0.97] transition-all duration-200 shadow-sm`}
-                    >
-                      {step.actionImg && (
-                        <img src={step.actionImg} alt="" className="w-4 h-4 object-contain" />
-                      )}
-                      {step.actionLabel}
-                    </button>
-                  )}
-
-                  {/* Chevron */}
-                  <span className={`text-slate-300 text-sm transition-transform duration-300 ${isActive ? 'rotate-90' : ''}`}>▶</span>
-                </div>
-
-                {/* Expanded detail */}
-                {isActive && (
-                  <div className={`px-5 pb-4 border-t ${c.border} bg-white/60 rounded-b-2xl`}>
-                    <div className="pt-3 text-sm text-slate-600 leading-relaxed">
-                      {step.id === 1 && (
-                        <ul className="space-y-1.5">
-                          <li className="flex items-center gap-2"><span className="text-violet-400">●</span> Foto form KYC nasabah perorangan</li>
-                          <li className="flex items-center gap-2"><span className="text-violet-400">●</span> Format: JPG, PNG, atau PDF scan</li>
-                          <li className="flex items-center gap-2"><span className="text-violet-400">●</span> OCR akan membaca: NIK, Nama, No. Telepon, Nama Ibu Kandung</li>
-                        </ul>
-                      )}
-                      {step.id === 2 && (
-                        <ul className="space-y-1.5">
-                          <li className="flex items-center gap-2"><span className="text-emerald-400">●</span> AI membaca dokumen & mengekstrak data otomatis</li>
-                          <li className="flex items-center gap-2"><span className="text-emerald-400">●</span> Data dikirim ke Google Sheets via MCP</li>
-                          <li className="flex items-center gap-2"><span className="text-emerald-400">●</span> Confidence score ditampilkan untuk tiap field</li>
-                        </ul>
-                      )}
-                      {step.id === 3 && (
-                        <ul className="space-y-1.5">
-                          <li className="flex items-center gap-2"><span className="text-blue-400">●</span> Spreadsheet interaktif muncul di chat</li>
-                          <li className="flex items-center gap-2"><span className="text-blue-400">●</span> Klik sel mana saja untuk mengedit langsung</li>
-                          <li className="flex items-center gap-2"><span className="text-blue-400">●</span> AI kirim JSON koreksi ke Sheets via MCP otomatis</li>
-                        </ul>
-                      )}
-                      {step.id === 4 && (
-                        <ul className="space-y-1.5">
-                          <li className="flex items-center gap-2"><span className="text-rose-400">●</span> Klik tombol Gmail untuk kirim email</li>
-                          <li className="flex items-center gap-2"><span className="text-rose-400">●</span> Penerima: CTO di cto@bankmandiri.co.id</li>
-                          <li className="flex items-center gap-2"><span className="text-rose-400">●</span> Attachment: PDF batch nasabah terverifikasi</li>
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </button>
-
-              {/* Connector line */}
-              {idx < STEPS.length - 1 && (
-                <div className="flex justify-center">
-                  <div className={`w-0.5 h-3 ${isDone ? 'bg-emerald-300' : 'bg-slate-200'} transition-colors duration-500`} />
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {/* Step label */}
+        <p className="text-[11px] text-slate-400 font-medium">
+          {current + 1} dari {SLIDES.length} langkah
+        </p>
       </div>
 
-      {/* Quick actions */}
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
-        {[
-          { label: '🆕 Input Nasabah Baru', msg: 'Saya ingin input data nasabah baru dari form fisik.' },
-          { label: '🗑️ Hapus Data Nasabah', msg: 'Saya ingin menghapus data nasabah.' },
-          { label: '📋 Cek Status Batch', msg: 'Tolong cek status batch input terakhir.' },
-        ].map(a => (
-          <button key={a.label} onClick={() => onQuickAction(a.msg)}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-200 shadow-sm
-              text-sm font-medium text-slate-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700
-              hover:shadow-md active:scale-[0.97] transition-all duration-200 cursor-pointer">
+      {/* ── Quick Actions ── */}
+      <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+        {QUICK_ACTIONS.map((a) => (
+          <button
+            key={a.label}
+            onClick={() => onQuickAction(a.msg)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm
+              text-sm font-medium text-slate-700 hover:bg-[#1AC1DD]/5 hover:border-[#1AC1DD]/40 hover:text-[#1AC1DD]
+              hover:shadow-md active:scale-[0.97] transition-all duration-200 cursor-pointer"
+          >
             {a.label}
           </button>
         ))}

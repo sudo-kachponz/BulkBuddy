@@ -250,7 +250,7 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
 
         <button onClick={() => onSendCto(rows)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
-            bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-md shadow-rose-500/20
+            bg-gradient-to-r from-amber-400 to-yellow-400 text-white shadow-md shadow-amber-400/25
             hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-200">
           <img src={mailIcon} alt="Gmail" className="w-4 h-4 object-contain" />
           Kirim ke CTO
