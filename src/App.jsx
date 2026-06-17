@@ -93,8 +93,8 @@ export default function App() {
   }
 
   /* ── Stream Agent Invoke ── */
-  const streamAgentInvoke = async (promptText, images = [], actionType = 'chat') => {
-    setIsTyping(true)
+  const streamAgentInvoke = async (promptText, images = [], actionType = 'chat', isSilent = false) => {
+    if (!isSilent) setIsTyping(true)
     let aiMessageIndex = -1
 
     const thread_id = chatThreadIdRef.current
@@ -136,11 +136,15 @@ export default function App() {
       let aiText = ""
       let currentEvent = ""
 
-      setMessages(prev => {
-        const newMessages = [...prev, { role: 'ai', text: 'Menghubungkan ke Agent...', isOcr: actionType === 'Input Form Fisik' }]
-        aiMessageIndex = newMessages.length - 1
-        return newMessages
-      })
+      let aiMessageIndex = -1;
+      
+      if (!isSilent) {
+        setMessages(prev => {
+          const newMessages = [...prev, { role: 'ai', text: 'Menghubungkan ke Agent...', isOcr: actionType === 'Input Form Fisik' }]
+          aiMessageIndex = newMessages.length - 1
+          return newMessages
+        })
+      }
 
       let finalSpreadsheetData = null
       let finalOptionsData = null
@@ -225,9 +229,10 @@ export default function App() {
                     }
                   }
                 }
-
-                setMessages(prev => {
-                  const updated = [...prev]
+                
+                if (!isSilent) {
+                  setMessages(prev => {
+                    const updated = [...prev]
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
                     updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
@@ -256,6 +261,7 @@ export default function App() {
                   }
                   return updated
                 })
+                }
               } else if (currentEvent === "status") {
                 if (data.status && data.status !== "Agent Execution End") {
                   setMessages(prev => {
@@ -275,27 +281,15 @@ export default function App() {
                   })
                 }
               } else if (currentEvent === "error") {
-                try {
-                  const errorData = JSON.parse(aiText);
-                  setMessages(prev => {
-                    const updated = [...prev]
-                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                      updated[aiMessageIndex].text = `❌ Error: ${errorData.error || aiText}`
-                      updated[aiMessageIndex].isError = true
-                    }
-                    return updated
-                  })
-                } catch (e) {
-                  setMessages(prev => {
-                    const updated = [...prev]
-                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-                      updated[aiMessageIndex].text = `❌ Error: ${aiText}`
-                      updated[aiMessageIndex].isError = true
-                    }
-                    return updated
-                  })
-                }
-                setIsTyping(false)
+                setMessages(prev => {
+                  const updated = [...prev]
+                  if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                    updated[aiMessageIndex].text = `❌ Error: ${data.error || "Unknown error"}`
+                    updated[aiMessageIndex].isError = true
+                  }
+                  return updated
+                })
+                if (!isSilent) setIsTyping(false)
               } else if (currentEvent === "tool_status") {
                 const statusSymbol = data.is_start ? "🛠️" : "✅"
                 setMessages(prev => {
@@ -336,37 +330,42 @@ export default function App() {
           finalWorkingData = Array.from(mergedMap.values());
           setWorkingData(finalWorkingData)
         }
+
         // Save state to backend asynchronously outside the render phase
         setTimeout(() => {
           saveCurrentStateToBackend(prev, finalWorkingData)
-          if (finalSpreadsheetData && finalWorkingData.length > 0 && actionType === 'Input Form Fisik') {
-            handleSaveToSheet(finalWorkingData)
+          if (finalSpreadsheetData && finalSpreadsheetData.length > 0 && actionType === 'Input Form Fisik') {
+            handleSaveToSheet(finalSpreadsheetData)
           }
         }, 0)
         return prev
       })
 
-      if (actionType === 'Kirim ke CTO') {
-        showToast('📧 Email berhasil dikirim ke CTO!', 'info')
-      } else if (actionType === 'Simpan ke Sheets') {
-        showToast('📊 Data berhasil disimpan ke Google Sheets!', 'success')
-      } else {
-        showToast('AI selesai memproses permintaan', 'success')
+      if (!isSilent) {
+        if (actionType === 'Kirim ke CTO') {
+          showToast('📧 Email berhasil dikirim ke CTO!', 'info')
+        } else if (actionType === 'Simpan ke Sheets') {
+          showToast('📊 Data berhasil disimpan ke Google Sheets!', 'success')
+        } else {
+          showToast('AI selesai memproses permintaan', 'success')
+        }
       }
 
     } catch (error) {
       console.error("Error invoking agent:", error)
-      showToast("Gagal berkomunikasi dengan Agent", "warning")
-      setMessages(prev => {
-        const updated = [...prev]
-        if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
-          updated[aiMessageIndex].text = `❌ Terjadi kesalahan: ${error.message}`
-        }
-        saveCurrentStateToBackend(updated, workingData)
-        return updated
-      })
+      if (!isSilent) {
+        showToast("Gagal berkomunikasi dengan Agent", "warning")
+        setMessages(prev => {
+          const updated = [...prev]
+          if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+            updated[aiMessageIndex].text = `❌ Terjadi kesalahan: ${error.message}`
+          }
+          saveCurrentStateToBackend(updated, workingData)
+          return updated
+        })
+      }
     } finally {
-      setIsTyping(false)
+      if (!isSilent) setIsTyping(false)
     }
   }
 
@@ -625,19 +624,25 @@ SANGAT PENTING:
       ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. 
 SANGAT PENTING: 
 1. JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut.
-2. WAJIB tambahkan tanda petik tunggal (') tepat sebelum angka pada kolom No KTP dan Handphone (contoh: '317... dan '08...). Ini MUTLAK agar tidak menjadi format E+ atau terpotong nol-nya.
-3. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET (JANGAN KUNINGKAN SEMUA BARIS). Biarkan format warna default dari template!
+2. JANGAN BACA ISI SPREADSHEET TERLEBIH DAHULU. Langsung saja APPEND/Tambahkan data di bawah ini menggunakan tool yang tersedia.
+3. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET.
+4. Saat memanggil tool untuk append row, pastikan kamu mengirimkan array berisi TEPAT 35 elemen sesuai urutan kolom template berikut:
+[NAMA, GELARSBL, GELARSDH, KELAMIN, TGL_LHR, KOTA_LHR, WARGA NEGARA, NO KTP / PASSPORT, KOTA_KTP, EXP_KTP/PASSPORT, JENIS IDENTITAS TAMBAHAN, NO IDENTITAS TAMBAHAN, IBUKANDUNG, STS KAWIN, ALAMAT1, ALAMAT2, KODEPOS, No Telp Rumah, No. Handphone, EMAIL, PEKERJAAN, JABATAN, EMPLOYER NAME, KODE_INDUSTRI, TGL_MULAI, GAJI, PEN_LAIN, CIF_NO, CURRENCY, PRODUK, BIAYA ADMIN KHUSUS, TUJUAN BUKA REKENING, KODE CABANG, BANSOS TYPE, CONSENT]
+Kosongkan dengan string kosong ("") untuk nilai yang tidak ada di data JSON.
 
-Data nasabah: \n${dataString}`
+Data nasabah untuk ditambahkan: \n${dataString}`
       : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'.
 SANGAT PENTING: 
-1. WAJIB tambahkan tanda petik tunggal (') tepat sebelum angka pada kolom No KTP dan Handphone (contoh: '317... dan '08...). Ini MUTLAK agar tidak menjadi format E+ atau terpotong nol-nya.
-2. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET (JANGAN KUNINGKAN SEMUA BARIS). Biarkan format warna default dari template!
+1. JANGAN BACA ISI SPREADSHEET TERLEBIH DAHULU. Langsung saja APPEND/Tambahkan data di bawah ini.
+2. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET.
+3. Saat memanggil tool untuk append row, pastikan kamu mengirimkan array berisi TEPAT 35 elemen sesuai urutan kolom template berikut:
+[NAMA, GELARSBL, GELARSDH, KELAMIN, TGL_LHR, KOTA_LHR, WARGA NEGARA, NO KTP / PASSPORT, KOTA_KTP, EXP_KTP/PASSPORT, JENIS IDENTITAS TAMBAHAN, NO IDENTITAS TAMBAHAN, IBUKANDUNG, STS KAWIN, ALAMAT1, ALAMAT2, KODEPOS, No Telp Rumah, No. Handphone, EMAIL, PEKERJAAN, JABATAN, EMPLOYER NAME, KODE_INDUSTRI, TGL_MULAI, GAJI, PEN_LAIN, CIF_NO, CURRENCY, PRODUK, BIAYA ADMIN KHUSUS, TUJUAN BUKA REKENING, KODE CABANG, BANSOS TYPE, CONSENT]
+Kosongkan dengan string kosong ("") untuk nilai yang tidak ada di data JSON.
 
-Data nasabah: \n${dataString}`
+Data nasabah untuk ditambahkan: \n${dataString}`
 
     // Silent background save — no chat message added
-    await streamAgentInvoke(prompt, [], 'Simpan ke Sheets')
+    await streamAgentInvoke(prompt, [], 'Simpan ke Sheets', true)
   }
 
   const isEmpty = messages.length === 0

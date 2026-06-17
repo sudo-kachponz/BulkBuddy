@@ -14,29 +14,29 @@ def get_llms(model_name: str="qwen3.7-plus", temperature=0):
     - DashScope models: Alibaba Cloud Qwen models
     """
     if model_name == "custom-vlm":
-        model_name = "qwen3.7-plus" # fallback to dashscope default
+        model_name = "qwen/qwen3.7-plus" # fallback to OpenRouter default
 
-    # 1. DashScope (Alibaba Qwen) Models
-    if "qwen" in model_name.lower():
-        dashscope_key = os.getenv("DASHSCOPE_API_KEY")
-        if not dashscope_key:
-            raise ValueError("DASHSCOPE_API_KEY not found in environment variables.")
+    # 1. OpenRouter Models (Primary)
+    if "qwen" in model_name.lower() or "/" in model_name:
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        if not openrouter_key:
+            raise ValueError("OPENROUTER_API_KEY not found in environment variables.")
         
-        print(f"Using DashScope model: {model_name}")
+        print(f"Using OpenRouter model: {model_name}")
         
-        kwargs = {
-            "api_key": dashscope_key,
-            "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-            "model": model_name,
-            "temperature": temperature,
-            "streaming": True,
-        }
-        
-        # Only enable thinking mode for non-VL qwen models (e.g. qwen3.7-plus)
-        if "-vl-" not in model_name.lower():
-            kwargs["model_kwargs"] = {"extra_body": {"enable_thinking": True}}
-            
-        return ChatOpenAI(**kwargs)
+        return ChatOpenAI(
+            api_key=openrouter_key,
+            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+            model=model_name,
+            temperature=temperature,
+            streaming=True,
+            model_kwargs={
+                "extra_headers": {
+                    "HTTP-Referer": "https://github.com/sudo-kachponz/BulkBuddy",
+                    "X-Title": "BulkBuddy Agent System"
+                }
+            }
+        )
 
     # 2. Direct OpenAI access
     elif model_name.startswith("gpt-"):
