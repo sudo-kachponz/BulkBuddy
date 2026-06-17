@@ -22,7 +22,7 @@ export const NASABAH_COLUMNS = [
   { key: 'kelamin',       csvHeader: 'KELAMIN',                   label: 'Kelamin',         type: 'enum',   source: 'ocr',     required: true,  width: 'min-w-[70px]',  options: ['M', 'F'] },
   { key: 'tgl_lhr',       csvHeader: 'TGL_LHR',                   label: 'Tgl Lahir',       type: 'string', source: 'ocr',     required: true,  width: 'min-w-[100px]' },
   { key: 'kota_lhr',      csvHeader: 'KOTA_LHR',                  label: 'Kota Lahir',      type: 'string', source: 'ocr',     required: true,  width: 'min-w-[110px]' },
-  { key: 'warga_negara',  csvHeader: 'WARGA NEGARA',              label: 'WN',              type: 'string', source: 'default', required: true,  width: 'min-w-[50px]',  defaultValue: 'ID' },
+  { key: 'warga_negara',  csvHeader: 'WARGA NEGARA',              label: 'WN',              type: 'string', source: 'default', required: true,  width: 'min-w-[50px]',  defaultValue: '000' },
   { key: 'no_ktp',        csvHeader: 'NO KTP / PASSPORT',         label: 'No KTP',          type: 'string', source: 'ocr',     required: true,  width: 'min-w-[160px]' },
   { key: 'kota_ktp',      csvHeader: 'KOTA_KTP',                  label: 'Kota KTP',        type: 'string', source: 'ocr',     required: true,  width: 'min-w-[120px]' },
   { key: 'exp_ktp',       csvHeader: 'EXP_KTP/PASSPORT',          label: 'Exp KTP',         type: 'number', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: 0 },
@@ -42,22 +42,22 @@ export const NASABAH_COLUMNS = [
   { key: 'email',         csvHeader: 'EMAIL',                     label: 'Email',           type: 'string', source: 'user',    required: false, width: 'min-w-[150px]' },
 
   // ── Pekerjaan ──
-  { key: 'pekerjaan',     csvHeader: 'PEKERJAAN',                 label: 'Pekerjaan',       type: 'string', source: 'ocr',     required: false, width: 'min-w-[80px]' },
+  { key: 'pekerjaan',     csvHeader: 'KERJAPSW',                  label: 'Pekerjaan',       type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: '' },
   { key: 'jabatan',       csvHeader: 'JABATAN',                   label: 'Jabatan',         type: 'string', source: 'user',    required: false, width: 'min-w-[80px]' },
-  { key: 'employer_name', csvHeader: 'EMPLOYER NAME',             label: 'Perusahaan',      type: 'string', source: 'user',    required: false, width: 'min-w-[120px]' },
-  { key: 'kode_industri', csvHeader: 'KODE_INDUSTRI',             label: 'Kd Industri',     type: 'number', source: 'user',    required: false, width: 'min-w-[80px]' },
-  { key: 'tgl_mulai',     csvHeader: 'TGL_MULAI',                 label: 'Tgl Mulai',       type: 'string', source: 'user',    required: false, width: 'min-w-[90px]' },
-  { key: 'gaji',          csvHeader: 'GAJI',                      label: 'Gaji',            type: 'number', source: 'user',    required: false, width: 'min-w-[100px]' },
-  { key: 'pen_lain',      csvHeader: 'PEN_LAIN',                  label: 'Pend. Lain',      type: 'number', source: 'user',    required: false, width: 'min-w-[80px]' },
+  { key: 'employer_name', csvHeader: 'EMPLOYER NAME',             label: 'Perusahaan',      type: 'string', source: 'default', required: false, width: 'min-w-[120px]', defaultValue: 'PT SUTET' },
+  { key: 'kode_industri', csvHeader: 'KODE_INDUSTRI',             label: 'Kd Industri',     type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: '09' },
+  { key: 'tgl_mulai',     csvHeader: 'TGL_MULA',                  label: 'Tgl Mulai',       type: 'string', source: 'default', required: false, width: 'min-w-[90px]',  defaultValue: '010226' },
+  { key: 'gaji',          csvHeader: 'GAJI',                      label: 'Gaji',            type: 'string', source: 'default', required: false, width: 'min-w-[100px]', defaultValue: '300000' },
+  { key: 'pen_lain',      csvHeader: 'PEN_LAIN',                  label: 'Pend. Lain',      type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: '0' },
 
   // ── Data Bank (biasanya default / prefilled) ──
-  { key: 'cif_no',        csvHeader: 'CIF_NO',                    label: 'CIF No',          type: 'number', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: 0 },
+  { key: 'cif_no',        csvHeader: 'CIF_NO',                    label: 'CIF No',          type: 'string', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: '0' },
   { key: 'currency',      csvHeader: 'CURRENCY',                  label: 'Currency',        type: 'string', source: 'default', required: true,  width: 'min-w-[70px]',  defaultValue: 'IDR' },
   { key: 'produk',        csvHeader: 'PRODUK',                    label: 'Produk',          type: 'string', source: 'default', required: true,  width: 'min-w-[110px]', defaultValue: 'TABMANDIRI' },
-  { key: 'biaya_admin',   csvHeader: 'BIAYA ADMIN KHUSUS',        label: 'Biaya Admin',     type: 'string', source: 'default', required: false, width: 'min-w-[90px]' },
+  { key: 'biaya_admin',   csvHeader: 'BIAYA ADMIN KHU',           label: 'Biaya Admin',     type: 'string', source: 'default', required: false, width: 'min-w-[90px]',  defaultValue: '' },
   { key: 'tujuan_buka',   csvHeader: 'TUJUAN BUKA REKENING',      label: 'Tujuan',          type: 'string', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: 'A' },
-  { key: 'kode_cabang',   csvHeader: 'KODE CABANG',               label: 'Kd Cabang',       type: 'number', source: 'default', required: true,  width: 'min-w-[80px]',  defaultValue: 12000 },
-  { key: 'bansos_type',   csvHeader: 'BANSOS TYPE',               label: 'Bansos',          type: 'string', source: 'default', required: false, width: 'min-w-[70px]' },
+  { key: 'kode_cabang',   csvHeader: 'KODE CABANG',               label: 'Kd Cabang',       type: 'string', source: 'default', required: true,  width: 'min-w-[80px]',  defaultValue: '12000' },
+  { key: 'bansos_type',   csvHeader: 'BANSOS TYPE',               label: 'Bansos',          type: 'string', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: '' },
   { key: 'consent',       csvHeader: 'CONSENT',                   label: 'Consent',         type: 'string', source: 'default', required: true,  width: 'min-w-[70px]',  defaultValue: 'YYYY' },
 ]
 
@@ -75,7 +75,15 @@ export const PRIMARY_COLUMNS = [
 export function createEmptyNasabah(id) {
   const row = { id }
   for (const col of NASABAH_COLUMNS) {
-    row[col.key] = col.defaultValue !== undefined ? col.defaultValue : ''
+    if (col.key === 'tgl_mulai') {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      row[col.key] = `${dd}${mm}${yyyy}`;
+    } else {
+      row[col.key] = col.defaultValue !== undefined ? col.defaultValue : ''
+    }
   }
   return row
 }
@@ -87,7 +95,19 @@ export function createEmptyNasabah(id) {
 export function toSheetRow(nasabah) {
   const row = {}
   for (const col of NASABAH_COLUMNS) {
-    row[col.csvHeader] = nasabah[col.key] ?? ''
+    let val = nasabah[col.key]
+    if (val === undefined || val === null || val === '') {
+      if (col.csvHeader === 'TGL_MULA') {
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        val = `${dd}${mm}${yyyy}`;
+      } else {
+        val = col.defaultValue !== undefined ? col.defaultValue : ''
+      }
+    }
+    row[col.csvHeader] = val
   }
   return row
 }

@@ -51,6 +51,24 @@ async def generate_reports(req: ReportRequest):
     # Prevent Excel from dropping leading zeros or using scientific notation
     target_columns = ["No Telp Rumah", "No. Handphone", "NO KTP / PASSPORT", "NO IDENTITAS TAMBAHAN", "KODEPOS", "CIF_NO"]
     for row in data:
+        # Add template default values
+        row["KERJAPSW"] = row.get("KERJAPSW", "")
+        row["WARGA NEGARA"] = row.get("WARGA NEGARA", "000")
+        row["EMPLOYER NAME"] = row.get("EMPLOYER NAME", "PT SUTET")
+        row["KODE_INDUSTRI"] = row.get("KODE_INDUSTRI", "09")
+        from datetime import datetime
+        row["TGL_MULA"] = row.get("TGL_MULA", datetime.now().strftime("%d%m%Y"))
+        row["GAJI"] = row.get("GAJI", "300000")
+        row["PEN_LAIN"] = row.get("PEN_LAIN", "0")
+        row["CIF_NO"] = row.get("CIF_NO", "0")
+        row["CURRENCY"] = row.get("CURRENCY", "IDR")
+        row["PRODUK"] = row.get("PRODUK", "TABMANDIRI")
+        row["BIAYA ADMIN KHU"] = row.get("BIAYA ADMIN KHU", "")
+        row["TUJUAN BUKA REKENING"] = row.get("TUJUAN BUKA REKENING", "A")
+        row["KODE CABANG"] = row.get("KODE CABANG", "12000")
+        row["BANSOS TYPE"] = row.get("BANSOS TYPE", "")
+        row["CONSENT"] = row.get("CONSENT", "YYYY")
+
         for col in target_columns:
             if col in row and row[col]:
                 val_str = str(row[col]).strip()

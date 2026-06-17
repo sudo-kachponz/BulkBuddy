@@ -7,7 +7,7 @@ import { MOCK_NASABAH, QUICK_ACTIONS } from './data/mockData'
 import mandiriLogo from './assets/bankmandiri_light.png'
 import mailIcon from './assets/mail.svg'
 import sheetIcon from './assets/sheet.svg'
-import { toSheetRow } from './data/schema'
+import { toSheetRow, createEmptyNasabah } from './data/schema'
 import { useChatHistory } from './hooks/useChatHistory'
 
 /* ── Helper: simulate AI delay ── */
@@ -238,7 +238,13 @@ export default function App() {
                         if (mergedMap.has(rid)) {
                           mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
                         } else {
-                          mergedMap.set(rid, r);
+                          const newRow = createEmptyNasabah(rid);
+                          for (const k in r) {
+                            if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
+                              newRow[k] = r[k];
+                            }
+                          }
+                          mergedMap.set(rid, newRow);
                         }
                       });
                       updated[aiMessageIndex].spreadsheet = Array.from(mergedMap.values());
@@ -296,7 +302,13 @@ export default function App() {
             if (mergedMap.has(rid)) {
               mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
             } else {
-              mergedMap.set(rid, r);
+              const newRow = createEmptyNasabah(rid);
+              for (const k in r) {
+                if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
+                  newRow[k] = r[k];
+                }
+              }
+              mergedMap.set(rid, newRow);
             }
           });
           finalWorkingData = Array.from(mergedMap.values());
@@ -332,8 +344,9 @@ export default function App() {
   }
 
   /* ── Handle user sending message ── */
-  const handleSend = useCallback(async ({ text, files, previews }) => {
-    const userMsg = { role: 'user', text, files, previews }
+  const handleSend = useCallback(async ({ text, displayText, files, previews }) => {
+    // displayText = kalimat pendek yang tampil di chat; text = prompt lengkap ke agent
+    const userMsg = { role: 'user', text: displayText || text, files, previews }
     setMessages(prev => [...prev, userMsg])
 
     const hasFiles = files && files.length > 0
@@ -434,17 +447,43 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
 
   /* ── Branching Actions ── */
   const handleNewSheet = useCallback(() => {
-    handleSend({ text: "Tolong simpan ke Spreadsheet Baru.", files: [], previews: [] })
+    handleSend({
+      text: "Tolong simpan ke Spreadsheet Baru.",
+      displayText: "✨ Buat Spreadsheet Baru",
+      files: [], previews: []
+    })
   }, [handleSend])
 
   const handleExistingSheet = useCallback(() => {
-    handleSend({ text: "Tolong cari 5 file spreadsheet terbaru di Google Drive yang bernama atau mengandung kata 'PLN SUTET'. Tampilkan daftarnya dengan nomor urut. Di baris paling bawah, kamu WAJIB mengetik persis: 'Pilih spreadsheet mana yang ingin digunakan'. JANGAN LAKUKAN TINDAKAN LAIN (SANGAT DILARANG MENAMBAH DATA ATAU MEMODIFIKASI SHEET SEBELUM SAYA MEMILIH).", files: [], previews: [] })
+    handleSend({
+      text: `Tolong cari file spreadsheet di Google Drive yang bernama atau mengandung kata 'PLN SUTET'. 
+Tampilkan maksimal 3 spreadsheet terbaru yang cocok.
+
+SANGAT PENTING: 
+1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
+2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
+[
+  {
+    "type": "sheet_option",
+    "title": "NAMA_FILE",
+    "url": "URL_FILE",
+    "date": "TANGGAL_DIBUAT"
+  }
+]
+3. JANGAN LAKUKAN TINDAKAN MODIFIKASI APAPUN PADA SHEET.`,
+      displayText: "🔍 Cari Spreadsheet yang Sudah Ada",
+      files: [], previews: []
+    })
   }, [handleSend])
 
   const handleSelectExistingSheet = useCallback((sheetName) => {
     const cleanSheetName = sheetName.replace(/\*/g, '').trim()
     setActiveSheetName(cleanSheetName)
-    handleSend({ text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`, files: [], previews: [] })
+    handleSend({
+      text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`,
+      displayText: `📄 Pakai spreadsheet: ${cleanSheetName}`,
+      files: [], previews: []
+    })
   }, [handleSend])
 
   /* ── New chat ── */
@@ -524,19 +563,14 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   // We no longer use MCP Gmail directly because we need PDF and Excel attachments.
   // Instead, onSendCto is mapped to handleConfirmSend which hits the Python backend.
 
-  /* ── Save to Sheet via MCP ── */
+  /* ── Save to Sheet via MCP (Auto-save, silent) ── */
   const handleSaveToSheet = async (updatedData) => {
     const dataString = JSON.stringify(updatedData, null, 2)
     const prompt = activeSheetName
       ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. SANGAT PENTING: JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
       : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
 
-    // Add user intent message to the chat first
-    setMessages(prev => [...prev, {
-      role: 'user',
-      text: 'Simpan data nasabah ini ke Google Sheets'
-    }])
-
+    // Silent background save — no chat message added
     await streamAgentInvoke(prompt, [], 'Simpan ke Sheets')
   }
 
@@ -590,13 +624,21 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
                   const mm = String(today.getMonth() + 1).padStart(2, '0');
                   const yyyy = today.getFullYear();
                   const sheetName = `SUTET-${dd}/${mm}/${yyyy}`;
-
+                  const dateStr = `${dd}/${mm}/${yyyy}`;
                   const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
 Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
-
-SANGAT PENTING:
-Setelah selesai menduplikat, tolong tampilkan kalimat konfirmasi singkat bahwa spreadsheet "${sheetName}" berhasil dibuat dan siap digunakan untuk input data nasabah baru. JANGAN memberikan tabel markdown.`;
-                  handleSend({ text: prompt, files: [], previews: [] });
+SANGAT PENTING: 
+1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
+2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
+[
+  {
+    "type": "sheet_option",
+    "title": "${sheetName}",
+    "url": "ISI_DENGAN_URL_SPREADSHEET_BARU",
+    "date": "${dateStr}"
+  }
+]`;
+                  handleSend({ text: prompt, displayText: `✨ Buat Sheet Baru — ${sheetName}`, files: [], previews: [] });
                 }}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#1AC1DD] text-[#1AC1DD] font-bold rounded-2xl shadow-lg hover:bg-[#1AC1DD] hover:text-white hover:-translate-y-1 transition-all duration-300"
               >
@@ -610,10 +652,8 @@ Setelah selesai menduplikat, tolong tampilkan kalimat konfirmasi singkat bahwa s
                   const mm = String(today.getMonth() + 1).padStart(2, '0');
                   const yyyy = today.getFullYear();
                   const dateStr = `${dd}/${mm}/${yyyy}`;
-
                   const prompt = `Tolong cari spreadsheet di Google Drive yang mengandung kata "SUTET-${dateStr}".
 Tampilkan maksimal 3 spreadsheet terbaru yang cocok. 
-
 SANGAT PENTING: 
 1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
 2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
@@ -622,11 +662,11 @@ SANGAT PENTING:
     "type": "sheet_option",
     "title": "SUTET-...",
     "url": "https://docs.google.com/spreadsheets/d/...",
-    "date": "17/06/2026"
+    "date": "${dateStr}"
   }
 ]
 3. JANGAN LAKUKAN TINDAKAN MODIFIKASI APAPUN PADA SHEET.`;
-                  handleSend({ text: prompt, files: [], previews: [] });
+                  handleSend({ text: prompt, displayText: `🔍 Pakai Sheet Hari Ini — ${dateStr}`, files: [], previews: [] });
                 }}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#10B981] text-[#10B981] font-bold rounded-2xl shadow-lg hover:bg-[#10B981] hover:text-white hover:-translate-y-1 transition-all duration-300"
               >

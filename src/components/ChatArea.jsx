@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { Bot, User } from 'lucide-react'
 import { ExtractedDataCard, SpreadsheetTable } from './DataCards'
+import sheetsIcon from '../assets/sheet.svg'
 
 /* ── Text Renderer Helper ── */
 function renderMarkdownHTML(text) {
@@ -95,25 +96,39 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
 
         {/* Spreadsheet Selection Buttons */}
         {message.sheetOptions && message.sheetOptions.length > 0 && (
-          <div className="flex flex-col gap-2 mt-3">
+          <div className="mt-4">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-1">Pilih Spreadsheet:</span>
-            {message.sheetOptions.map((opt, idx) => (
-              <div key={idx} className="flex gap-2 w-full animate-in slide-in-from-bottom-2 fade-in">
-                {opt.url && (
-                  <a href={opt.url} target="_blank" rel="noreferrer" title="Buka di tab baru"
-                    className="flex-shrink-0 flex items-center justify-center px-3 py-2.5 bg-white border border-slate-200 text-primary-500 rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:text-primary-600 transition-colors">
-                    🔗 Link
-                  </a>
-                )}
-                <button
-                  onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)}
-                  className="flex-1 text-left px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors flex flex-wrap gap-2 justify-between items-center cursor-pointer"
-                >
-                  <span className="truncate max-w-[200px]" title={opt.title}>📄 {opt.title}</span>
-                  {opt.date && <span className="text-[10px] text-slate-400 font-normal bg-slate-100 px-2 py-0.5 rounded-full whitespace-nowrap">{opt.date}</span>}
-                </button>
-              </div>
-            ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+              {message.sheetOptions
+                .filter((opt, index, self) => index === self.findIndex((t) => t.title === opt.title))
+                .map((opt, idx) => (
+                <div key={idx} className="flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary-300 transition-all group animate-in slide-in-from-bottom-2 fade-in">
+                  <button
+                    onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)}
+                    className="p-3 pb-0 text-left cursor-pointer flex-1"
+                  >
+                    <div className="w-full h-24 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200/50 flex items-center justify-center mb-3">
+                      <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center">
+                        <img src={sheetsIcon} alt="Google Sheets" className="w-7 h-7 object-contain" />
+                      </div>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-700 truncate px-1" title={opt.title}>{opt.title}</h4>
+                    <p className="text-[11px] text-slate-400 mt-1 px-1">Google Sheets • {opt.date || 'Terbaru'}</p>
+                  </button>
+                  <div className="p-3 pt-3 mt-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <button onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)} className="text-xs font-bold text-primary-600 hover:text-primary-700 cursor-pointer bg-primary-50 px-3 py-1.5 rounded-lg transition-colors">
+                      Pilih & Pakai Ini
+                    </button>
+                    {opt.url && (
+                      <a href={opt.url} target="_blank" rel="noreferrer" title="Buka di Google Drive"
+                        className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-primary-500 hover:border-primary-300 hover:shadow-sm transition-all">
+                        ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

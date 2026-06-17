@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CheckCircle2, AlertTriangle, Download, Send, FileText, Save, Pencil, X, Check } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Download, Send, FileText, Pencil, X, Check } from 'lucide-react'
 import { NASABAH_COLUMNS, PRIMARY_COLUMNS, toMCPPayload } from '../data/schema'
 import sheetsIcon from '../assets/sheet.svg'
 import mailIcon from '../assets/mail.svg'
@@ -105,8 +105,8 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
   const [rows, setRows] = useState(() => data.map(d => ({ ...d })))
   const [editCell, setEditCell] = useState(null)
   const [draft, setDraft] = useState('')
-  const [savedRows, setSavedRows] = useState([])
-  const [hasChanges, setHasChanges] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
+  const autoSaveTimerRef = useRef(null)
 
   // Update rows if new data streams in (length changes)
   useEffect(() => {
@@ -114,6 +114,18 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
       setRows(data.map(d => ({ ...d })))
     }
   }, [data.length])
+
+  // Auto-save with debounce whenever rows change
+  const triggerAutoSave = (updatedRows) => {
+    if (!onSaveToSheet) return
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    setSaveStatus('saving')
+    autoSaveTimerRef.current = setTimeout(() => {
+      onSaveToSheet(updatedRows)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }, 800)
+  }
 
   const startEdit = (rowIdx, col, currentVal) => {
     setEditCell({ rowIdx, col })
@@ -125,8 +137,9 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
     const { rowIdx, col } = editCell
     const prev = String(rows[rowIdx][col] ?? '')
     if (draft !== prev) {
-      setRows(r => r.map((row, i) => i === rowIdx ? { ...row, [col]: draft } : row))
-      setHasChanges(true)
+      const updatedRows = rows.map((row, i) => i === rowIdx ? { ...row, [col]: draft } : row)
+      setRows(updatedRows)
+      triggerAutoSave(updatedRows)
     }
     setEditCell(null)
   }
@@ -136,13 +149,6 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
     setDraft('')
   }
 
-  const handleSave = () => {
-    const payload = toMCPPayload(rows)
-    setSavedRows(rows.map(r => r.id))
-    setHasChanges(false)
-    onSaveToSheet && onSaveToSheet(rows, payload)
-  }
-
   return (
     <div className="rounded-2xl border border-[#344054]/20 bg-[#F2F4F7] overflow-hidden shadow-sm">
       {/* Header */}
@@ -150,17 +156,22 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
         <img src={sheetsIcon} alt="Sheets" className="w-6 h-6 object-contain" />
         <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {rows.length} Nasabah</span>
         <span className="text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
-        {hasChanges && (
-          <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full animate-pulse">
-            ✏️ Ada perubahan belum disimpan
-          </span>
-        )}
+        <span className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all duration-300
+          ${saveStatus === 'saving' ? 'text-amber-600 bg-amber-50 border border-amber-200 animate-pulse' :
+            saveStatus === 'saved' ? 'text-emerald-600 bg-emerald-50 border border-emerald-200' :
+            'text-slate-400 bg-slate-50 border border-slate-200'}">
+          {saveStatus === 'saving' && '⏳ Menyimpan ke Sheets...'}
+          {saveStatus === 'saved' && '✅ Tersimpan otomatis'}
+          {saveStatus === 'idle' && (
+            <><img src={sheetsIcon} alt="" className="w-3 h-3 object-contain opacity-50" /> Auto-save aktif</>
+          )}
+        </span>
       </div>
 
       {/* Hint */}
       <div className="px-5 py-2 bg-slate-50/60 border-b border-slate-100 flex items-center gap-2">
         <Pencil size={11} className="text-slate-400" />
-        <span className="text-[11px] text-slate-400">Klik sel mana saja untuk mengedit data langsung. Scroll horizontal untuk kolom lainnya →</span>
+        <span className="text-[11px] text-slate-400">Klik sel mana saja untuk mengedit — perubahan langsung tersimpan ke Spreadsheet →</span>
       </div>
 
       {/* Table */}
@@ -186,14 +197,10 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, i) => {
-              const isSaved = savedRows.includes(row.id)
               const isLowConf = row.confidence < 80
               return (
                 <tr key={row.id}
-                  className={`transition-colors ${isSaved ? 'bg-emerald-50/40' :
-                    isLowConf ? 'bg-amber-50/30' :
-                      'hover:bg-primary-50/30'
-                    }`}>
+                  className={`transition-colors ${isLowConf ? 'bg-amber-50/30' : 'hover:bg-primary-50/30'}`}>
                   <td className="px-3 py-2 text-slate-400 font-medium text-xs sticky left-0 bg-white/95 z-10 border-r border-slate-100">
                     <div className="flex items-center gap-1.5">
                       <span>{i + 1}</span>
@@ -226,19 +233,6 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
-        <button onClick={handleSave}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200
-            ${hasChanges
-              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/20 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97]'
-              : 'bg-white border border-slate-200 text-slate-400 cursor-default'
-            }`}
-          disabled={!hasChanges}
-        >
-          <img src={sheetsIcon} alt="Sheets" className="w-4 h-4 object-contain" />
-          <Save size={14} />
-          Simpan ke Sheets
-        </button>
-
         <button onClick={onExportPdf}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
             bg-white border border-slate-200 text-slate-700 shadow-sm
