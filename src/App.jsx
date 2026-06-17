@@ -108,7 +108,7 @@ export default function App() {
         body: JSON.stringify({
           input: {
             messages: promptText,
-            context: "ATURAN WAJIB MUTLAK: Jika Anda membaca, memanipulasi, atau mengeluarkan data nasabah, Anda WAJIB mengeluarkannya DALAM FORMAT JSON ARRAY SEPERTI INI: ```json\n[{ \"id\": \"1\", \"nama\": \"...\", \"kelamin\": \"...\", \"tgl_lhr\": \"...\", \"no_ktp\": \"...\", \"ibu_kandung\": \"...\", \"handphone\": \"...\", \"alamat1\": \"...\", \"kodepos\": \"...\", \"currency\": \"IDR\", \"produk\": \"TABMANDIRI\", \"kode_cabang\": 12000, \"consent\": \"YYYY\" }]\n``` SANGAT DILARANG MENGGUNAKAN TABEL MARKDOWN (| Field | Value |) UNTUK MERINGKAS ATAU MENAMPILKAN DATA NASABAH! JIKA KAMU MENGGUNAKAN TABEL MARKDOWN, SISTEM FRONTEND AKAN ERROR PARAH! Tulis kata pengantar biasa, lalu langsung berikan blok JSON utuh. KHUSUS JIKA SELESAI MENGEKSTRAK OCR GAMBAR ATAU MEMBACA DATA, tanyakan di akhir respons: 'Apakah Anda ingin menyimpan data ini ke Spreadsheet Baru atau menambahkannya ke Spreadsheet yang Sudah Ada?'",
+            context: "ATURAN WAJIB MUTLAK: Jika Anda membaca, memanipulasi, atau mengeluarkan data nasabah, Anda WAJIB mengeluarkannya DALAM FORMAT JSON ARRAY SEPERTI INI: ```json\n[{ \"id\": \"1\", \"nama\": \"...\", \"kelamin\": \"...\", \"tgl_lhr\": \"...\", \"no_ktp\": \"...\", \"ibu_kandung\": \"...\", \"handphone\": \"...\", \"alamat1\": \"...\", \"kodepos\": \"...\", \"currency\": \"IDR\", \"produk\": \"TABMANDIRI\", \"kode_cabang\": 12000, \"consent\": \"YYYY\" }]\n``` SANGAT DILARANG MENGGUNAKAN TABEL MARKDOWN (| Field | Value |) UNTUK MERINGKAS ATAU MENAMPILKAN DATA NASABAH! JIKA KAMU MENGGUNAKAN TABEL MARKDOWN, SISTEM FRONTEND AKAN ERROR PARAH! Tulis kata pengantar biasa, lalu langsung berikan blok JSON utuh.",
             image_path: null,
             image_urls: images.length > 0 ? images : null
           },
@@ -118,7 +118,7 @@ export default function App() {
             }
           },
           metadata: {
-            model_name: "anthropic/claude-sonnet-4.6",
+            model_name: "custom-vlm",
             reset_memory: false,
             load_from_json: true,
             agent_style: ""
@@ -274,6 +274,28 @@ export default function App() {
                     return updated
                   })
                 }
+              } else if (currentEvent === "error") {
+                try {
+                  const errorData = JSON.parse(aiText);
+                  setMessages(prev => {
+                    const updated = [...prev]
+                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                      updated[aiMessageIndex].text = `❌ Error: ${errorData.error || aiText}`
+                      updated[aiMessageIndex].isError = true
+                    }
+                    return updated
+                  })
+                } catch (e) {
+                  setMessages(prev => {
+                    const updated = [...prev]
+                    if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
+                      updated[aiMessageIndex].text = `❌ Error: ${aiText}`
+                      updated[aiMessageIndex].isError = true
+                    }
+                    return updated
+                  })
+                }
+                setIsTyping(false)
               } else if (currentEvent === "tool_status") {
                 const statusSymbol = data.is_start ? "🛠️" : "✅"
                 setMessages(prev => {
@@ -315,7 +337,12 @@ export default function App() {
           setWorkingData(finalWorkingData)
         }
         // Save state to backend asynchronously outside the render phase
-        setTimeout(() => saveCurrentStateToBackend(prev, finalWorkingData), 0)
+        setTimeout(() => {
+          saveCurrentStateToBackend(prev, finalWorkingData)
+          if (finalSpreadsheetData && finalWorkingData.length > 0 && actionType === 'Input Form Fisik') {
+            handleSaveToSheet(finalWorkingData)
+          }
+        }, 0)
         return prev
       })
 
@@ -486,7 +513,7 @@ SANGAT PENTING:
     })
   }, [handleSend])
 
-  /* ── New chat ── */
+  /* ── New chat (Auto-creates Sheet) ── */
   const handleNewChat = () => {
     setMessages([])
     setWorkingData([])
@@ -494,6 +521,33 @@ SANGAT PENTING:
     setActiveSheetName(null)
     setIsTyping(false)
     chatThreadIdRef.current = crypto.randomUUID()
+
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const time = new Date().toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '');
+    const sheetName = `SUTET-${dd}/${mm}/${yyyy}-${time}`;
+    setActiveSheetName(sheetName);
+    const dateStr = `${dd}/${mm}/${yyyy}`;
+    const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
+Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
+SANGAT PENTING: 
+1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
+2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
+[
+  {
+    "type": "sheet_option",
+    "title": "${sheetName}",
+    "url": "ISI_DENGAN_URL_SPREADSHEET_BARU",
+    "date": "${dateStr}"
+  }
+]`;
+    
+    // Auto trigger
+    setTimeout(() => {
+      handleSend({ text: prompt, displayText: `✨ Membuat Spreadsheet Baru — ${sheetName}`, files: [], previews: [] });
+    }, 100);
   }
 
   /* ── Load chat from history ── */
@@ -505,6 +559,7 @@ SANGAT PENTING:
       chatThreadIdRef.current = fullSession.thread_id
       setMessages(fullSession.messages || [])
       setWorkingData(fullSession.working_data || [])
+      setActiveSheetName(fullSession.title || chatItem.title)
     }
   }
 
@@ -567,8 +622,19 @@ SANGAT PENTING:
   const handleSaveToSheet = async (updatedData) => {
     const dataString = JSON.stringify(updatedData, null, 2)
     const prompt = activeSheetName
-      ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. SANGAT PENTING: JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
-      : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
+      ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. 
+SANGAT PENTING: 
+1. JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut.
+2. WAJIB tambahkan tanda petik tunggal (') tepat sebelum angka pada kolom No KTP dan Handphone (contoh: '317... dan '08...). Ini MUTLAK agar tidak menjadi format E+ atau terpotong nol-nya.
+3. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET (JANGAN KUNINGKAN SEMUA BARIS). Biarkan format warna default dari template!
+
+Data nasabah: \n${dataString}`
+      : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'.
+SANGAT PENTING: 
+1. WAJIB tambahkan tanda petik tunggal (') tepat sebelum angka pada kolom No KTP dan Handphone (contoh: '317... dan '08...). Ini MUTLAK agar tidak menjadi format E+ atau terpotong nol-nya.
+2. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET (JANGAN KUNINGKAN SEMUA BARIS). Biarkan format warna default dari template!
+
+Data nasabah: \n${dataString}`
 
     // Silent background save — no chat message added
     await streamAgentInvoke(prompt, [], 'Simpan ke Sheets')
@@ -615,64 +681,7 @@ SANGAT PENTING:
           <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white/40 to-transparent overflow-y-auto">
             <InteractiveTutorial onQuickAction={handleQuickAction} />
 
-            {/* New Buttons for Sheet Flow */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-w-2xl justify-center px-4 animate-in slide-in-from-bottom-4 fade-in">
-              <button
-                onClick={() => {
-                  const today = new Date();
-                  const dd = String(today.getDate()).padStart(2, '0');
-                  const mm = String(today.getMonth() + 1).padStart(2, '0');
-                  const yyyy = today.getFullYear();
-                  const sheetName = `SUTET-${dd}/${mm}/${yyyy}`;
-                  const dateStr = `${dd}/${mm}/${yyyy}`;
-                  const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
-Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
-SANGAT PENTING: 
-1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
-2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
-[
-  {
-    "type": "sheet_option",
-    "title": "${sheetName}",
-    "url": "ISI_DENGAN_URL_SPREADSHEET_BARU",
-    "date": "${dateStr}"
-  }
-]`;
-                  handleSend({ text: prompt, displayText: `✨ Buat Sheet Baru — ${sheetName}`, files: [], previews: [] });
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#1AC1DD] text-[#1AC1DD] font-bold rounded-2xl shadow-lg hover:bg-[#1AC1DD] hover:text-white hover:-translate-y-1 transition-all duration-300"
-              >
-                ✨ Buat Sheet Baru
-              </button>
-
-              <button
-                onClick={() => {
-                  const today = new Date();
-                  const dd = String(today.getDate()).padStart(2, '0');
-                  const mm = String(today.getMonth() + 1).padStart(2, '0');
-                  const yyyy = today.getFullYear();
-                  const dateStr = `${dd}/${mm}/${yyyy}`;
-                  const prompt = `Tolong cari spreadsheet di Google Drive yang mengandung kata "SUTET-${dateStr}".
-Tampilkan maksimal 3 spreadsheet terbaru yang cocok. 
-SANGAT PENTING: 
-1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
-2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
-[
-  {
-    "type": "sheet_option",
-    "title": "SUTET-...",
-    "url": "https://docs.google.com/spreadsheets/d/...",
-    "date": "${dateStr}"
-  }
-]
-3. JANGAN LAKUKAN TINDAKAN MODIFIKASI APAPUN PADA SHEET.`;
-                  handleSend({ text: prompt, displayText: `🔍 Pakai Sheet Hari Ini — ${dateStr}`, files: [], previews: [] });
-                }}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#10B981] text-[#10B981] font-bold rounded-2xl shadow-lg hover:bg-[#10B981] hover:text-white hover:-translate-y-1 transition-all duration-300"
-              >
-                🔍 Pakai Sheet Hari Ini
-              </button>
-            </div>
+            {/* Homepage buttons removed per 1 Session = 1 Spreadsheet flow */}
           </div>
         ) : (
           <ChatArea
@@ -688,32 +697,7 @@ SANGAT PENTING:
           />
         )}
 
-        {/* Chat Recommendations */}
-        {(() => {
-          const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-          const isModel = lastMsg?.role === 'model' || lastMsg?.role === 'ai';
-          const hasText = lastMsg?.text || '';
-          const matchesKeyword = /spreadsheet baru/i.test(hasText) || /sudah ada/i.test(hasText) || /menyimpan data ini/i.test(hasText);
-
-          if (isTyping || !isModel || !matchesKeyword) return null;
-
-          return (
-            <div className="shrink-0 flex flex-wrap items-center justify-center gap-3 py-3 px-4 bg-white shadow-[0_-4px_15px_rgba(0,0,0,0.05)] border-t border-slate-100 z-20 w-full animate-in slide-in-from-bottom-2">
-              <button
-                onClick={handleNewSheet}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-primary-200 text-primary-700 font-bold rounded-full text-sm shadow-md hover:bg-primary-50 hover:border-primary-400 hover:-translate-y-1 transition-all duration-200"
-              >
-                ✨ Buat Sheet Baru
-              </button>
-              <button
-                onClick={handleExistingSheet}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-full text-sm shadow-md hover:bg-slate-50 hover:border-slate-300 hover:-translate-y-1 transition-all duration-200"
-              >
-                🔍 Tambahkan ke Sheet Eksisting
-              </button>
-            </div>
-          );
-        })()}
+        {/* Chat Recommendations dihapus (1 Session = 1 Spreadsheet) */}
 
         {/* Input bar */}
         <InputBar onSend={handleSend} disabled={isTyping} />
