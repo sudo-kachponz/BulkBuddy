@@ -1,5 +1,7 @@
 # 🏦 BulkBuddy
 
+<img width="1932" height="1307" alt="BulkBuddy Preview" src="https://github.com/user-attachments/assets/34de84ee-7b93-4472-9c00-19cb80ad062f" />
+
 **BulkBuddy** adalah aplikasi pintar berbasis AI (Artificial Intelligence) untuk mengotomatisasi alur kerja Pembukaan Rekening Kolektif (Bulk Account Opening) di Bank Mandiri. Aplikasi ini dirancang khusus untuk mempermudah tim Cash & Trade Operations (CTO) dalam memproses formulir pendaftaran fisik secara instan.
 
 Dengan mengombinasikan kemampuan **Gemini-OCR** (Optical Character Recognition) dan teknologi **MCP (Model Context Protocol)**, BulkBuddy dapat mengekstrak data dari KTP/Formulir secara akurat, lalu menyimpannya langsung ke Google Sheets, membuat laporan dalam format PDF/Excel, dan secara otomatis mengirimkan email rekapitulasi langsung kepada CTO.

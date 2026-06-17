@@ -44,6 +44,16 @@ export default function App() {
   // Chat History via custom hook
   const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
+  
+  // Refs to prevent duplicate creations and track sync state
+  const activeSessionRef = useRef(null)
+  const creatingSessionRef = useRef(false)
+  const chatThreadIdRef = useRef(crypto.randomUUID())
+
+  // Sync ref
+  useEffect(() => {
+    activeSessionRef.current = activeSession
+  }, [activeSession])
 
   // Load sidebar sessions on mount
   useEffect(() => {
@@ -52,18 +62,27 @@ export default function App() {
 
   // Helper to persist current UI state to backend
   const saveCurrentStateToBackend = async (newMessages, newWorkingData) => {
-    if (activeSession) {
-      await updateSession(activeSession.id, {
+    if (activeSessionRef.current) {
+      await updateSession(activeSessionRef.current.id, {
         messages: newMessages,
         workingData: newWorkingData
       })
     } else {
-      const sess = await createSession({
-        messages: newMessages,
-        workingData: newWorkingData,
-        thread_id: crypto.randomUUID() // fresh thread per session
-      })
-      if (sess) setActiveSession(sess)
+      if (creatingSessionRef.current) return;
+      creatingSessionRef.current = true;
+      try {
+        const sess = await createSession({
+          messages: newMessages,
+          workingData: newWorkingData,
+          thread_id: chatThreadIdRef.current
+        })
+        if (sess) {
+          setActiveSession(sess)
+          activeSessionRef.current = sess
+        }
+      } finally {
+        creatingSessionRef.current = false;
+      }
     }
   }
 
@@ -77,17 +96,7 @@ export default function App() {
     setIsTyping(true)
     let aiMessageIndex = -1
     
-    // Auto-create session if none active
-    let currentSession = activeSession
-    if (!currentSession) {
-       currentSession = await createSession({
-         messages: [...messages, { role: 'user', text: promptText }],
-         workingData: workingData,
-         thread_id: crypto.randomUUID()
-       })
-       setActiveSession(currentSession)
-    }
-    const thread_id = currentSession ? currentSession.thread_id : "1"
+    const thread_id = chatThreadIdRef.current
 
     try {
       const response = await fetch("http://localhost:8000/agent-invoke/fff649af-1f16-4027-9371-76a4d587096b/invoke-stream", {
@@ -250,8 +259,8 @@ export default function App() {
            finalWorkingData = [...workingData, ...finalSpreadsheetData]
            setWorkingData(finalWorkingData)
         }
-        // Save state to backend
-        saveCurrentStateToBackend(prev, finalWorkingData)
+        // Save state to backend asynchronously outside the render phase
+        setTimeout(() => saveCurrentStateToBackend(prev, finalWorkingData), 0)
         return prev
       })
 
@@ -282,11 +291,7 @@ export default function App() {
   /* ── Handle user sending message ── */
   const handleSend = useCallback(async ({ text, files, previews }) => {
     const userMsg = { role: 'user', text, files, previews }
-    setMessages(prev => {
-      const newMsg = [...prev, userMsg]
-      saveCurrentStateToBackend(newMsg, workingData)
-      return newMsg
-    })
+    setMessages(prev => [...prev, userMsg])
 
     const hasFiles = files && files.length > 0
     let promptToSend = text;
@@ -404,6 +409,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     setActiveSession(null)
     setActiveSheetName(null)
     setIsTyping(false)
+    chatThreadIdRef.current = crypto.randomUUID()
   }
 
   /* ── Load chat from history ── */
@@ -412,6 +418,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     const fullSession = await getSession(chatItem.id)
     if (fullSession) {
       setActiveSession(fullSession)
+      chatThreadIdRef.current = fullSession.thread_id
       setMessages(fullSession.messages || [])
       setWorkingData(fullSession.working_data || [])
     }
@@ -427,9 +434,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
 
     const userMsg = { role: 'user', text: 'Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
-    const newMsgs = [...messages, userMsg]
-    setMessages(newMsgs)
-    saveCurrentStateToBackend(newMsgs, workingData)
+    setMessages(prev => [...prev, userMsg])
 
     try {
       const response = await fetch('http://localhost:8000/api/generate-reports', {
@@ -447,7 +452,11 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
         role: 'model',
         text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
       }
-      setMessages(prev => [...prev, aiMsg])
+      setMessages(prev => {
+        const newMsgs = [...prev, aiMsg]
+        setTimeout(() => saveCurrentStateToBackend(newMsgs, workingData), 0)
+        return newMsgs
+      })
 
     } catch (e) {
       console.error(e)
@@ -457,7 +466,11 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
         role: 'model',
         text: `❌ **Pengiriman Email Gagal**\n\nPesan Error: \`${e.message}\`\n\nPastikan kamu sudah menambahkan \`SMTP_USERNAME\` dan \`SMTP_PASSWORD\` yang valid (App Password) di dalam file \`.env\` server backend.`
       }
-      setMessages(prev => [...prev, aiMsg])
+      setMessages(prev => {
+        const newMsgs = [...prev, aiMsg]
+        setTimeout(() => saveCurrentStateToBackend(newMsgs, workingData), 0)
+        return newMsgs
+      })
     }
   }
 
@@ -473,14 +486,10 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
       : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'. Tuliskan baris-baris data nasabah ini ke sheet tersebut. Data nasabah: \n${dataString}`
 
     // Add user intent message to the chat first
-    setMessages(prev => {
-      const newMsg = [...prev, {
-        role: 'user',
-        text: 'Simpan data nasabah ini ke Google Sheets'
-      }]
-      saveCurrentStateToBackend(newMsg, workingData)
-      return newMsg
-    })
+    setMessages(prev => [...prev, {
+      role: 'user',
+      text: 'Simpan data nasabah ini ke Google Sheets'
+    }])
 
     await streamAgentInvoke(prompt, [], 'Simpan ke Sheets')
   }
