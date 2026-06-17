@@ -107,7 +107,7 @@ export default function App() {
         body: JSON.stringify({
           input: {
             messages: promptText,
-            context: "ATURAN WAJIB MUTLAK: Jika Anda membaca, memanipulasi, atau mengeluarkan data nasabah, Anda WAJIB mengeluarkannya DALAM FORMAT JSON ARRAY SEPERTI INI: ```json\n[{ \"id\": \"1\", \"nama\": \"...\", \"kelamin\": \"...\", \"tgl_lhr\": \"...\", \"no_ktp\": \"...\", \"ibu_kandung\": \"...\", \"handphone\": \"...\", \"alamat1\": \"...\", \"kodepos\": \"...\", \"currency\": \"IDR\", \"produk\": \"TABMANDIRI\", \"kode_cabang\": 12000, \"consent\": \"YYYY\" }]\n``` SANGAT DILARANG MENGGUNAKAN TABEL MARKDOWN (| Field | Value |) UNTUK MERINGKAS ATAU MENAMPILKAN DATA NASABAH! JIKA KAMU MENGGUNAKAN TABEL MARKDOWN, SISTEM FRONTEND AKAN ERROR PARAH! Tulis kata pengantar biasa, lalu langsung berikan blok JSON utuh. KHUSUS JIKA SELESAI MENGEKSTRAK OCR GAMBAR ATAU MEMBACA DATA, tanyakan di akhir respons: 'Apakah Anda ingin menyimpan data ini ke Spreadsheet Baru atau menambahkannya ke Spreadsheet yang Sudah Ada?'",
+            context: "ATURAN WAJIB:\n- Jika membaca/mengekstrak data nasabah, WAJIB keluarkan dalam RAW JSON ARRAY (```json\n[{...}]\n```).\n- DILARANG KERAS menggunakan Tabel Markdown (| Field |) untuk data nasabah agar UI tidak crash.\n- Berikan pengantar singkat, lalu langsung blok JSON utuh.\n- SETELAH OCR/BACA DATA, wajib tanya: 'Ingin simpan ke Spreadsheet Baru atau yang Sudah Ada?'",
             image_path: null,
             image_urls: images.length > 0 ? images : null
           },

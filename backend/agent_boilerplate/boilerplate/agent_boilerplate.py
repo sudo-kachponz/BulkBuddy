@@ -21,6 +21,12 @@ from datetime import datetime, timezone
 from supabase import create_client, Client
 import uuid
 
+# Inject backend dir to path for utils
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+from utils.toon_converter import wrap_tool_with_toon
+
 # Import from the current package
 from .models import AgentInput
 from .agent_templates.react_agent import get_react_agent
@@ -397,7 +403,27 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            langchain_tools = await client.get_tools()
+            raw_tools = await client.get_tools()
+            
+            # Apply TOON wrapper
+            wrapped_tools = [wrap_tool_with_toon(t) for t in raw_tools]
+            
+            # Dynamic Tool Filtering
+            query_lower = query.lower()
+            allowed_prefixes = []
+            if any(k in query_lower for k in ["email", "kirim", "cto", "pesan"]):
+                allowed_prefixes.append("gmail")
+            if any(k in query_lower for k in ["sheet", "simpan", "data nasabah", "tabel"]):
+                allowed_prefixes.append("spreadsheet")
+            if any(k in query_lower for k in ["drive", "cari", "file", "folder"]):
+                allowed_prefixes.append("drive")
+                
+            langchain_tools = wrapped_tools
+            if allowed_prefixes:
+                filtered_tools = [t for t in wrapped_tools if any(t.name.lower().startswith(p) for p in allowed_prefixes)]
+                if filtered_tools:
+                    langchain_tools = filtered_tools
+                    print(f"Dynamically loaded {len(langchain_tools)} tools for prefixes: {allowed_prefixes}")
             agent = get_react_agent(
                 model_name=model_name,
                 temperature=temperature,
@@ -496,7 +522,27 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            langchain_tools = await client.get_tools()
+            raw_tools = await client.get_tools()
+            
+            # Apply TOON wrapper
+            wrapped_tools = [wrap_tool_with_toon(t) for t in raw_tools]
+            
+            # Dynamic Tool Filtering
+            query_lower = str(agent_input.input.messages).lower()
+            allowed_prefixes = []
+            if any(k in query_lower for k in ["email", "kirim", "cto", "pesan"]):
+                allowed_prefixes.append("gmail")
+            if any(k in query_lower for k in ["sheet", "simpan", "data nasabah", "tabel"]):
+                allowed_prefixes.append("spreadsheet")
+            if any(k in query_lower for k in ["drive", "cari", "file", "folder"]):
+                allowed_prefixes.append("drive")
+                
+            langchain_tools = wrapped_tools
+            if allowed_prefixes:
+                filtered_tools = [t for t in wrapped_tools if any(t.name.lower().startswith(p) for p in allowed_prefixes)]
+                if filtered_tools:
+                    langchain_tools = filtered_tools
+                    print(f"Dynamically loaded {len(langchain_tools)} tools for prefixes: {allowed_prefixes}")
             
             if use_react_text:
                 print(f"Using ReAct text-based agent for {model_name}")
