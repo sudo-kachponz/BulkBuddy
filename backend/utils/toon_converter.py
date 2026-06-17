@@ -34,43 +34,35 @@ def to_toon_format(data: Any) -> str:
     except:
         return str(data)
 
+from langchain_core.tools import StructuredTool
+
 def wrap_tool_with_toon(tool):
     """Wraps a LangChain BaseTool to convert its output to TOON format."""
-    # We patch the standard execution methods used by LangChain/LangGraph
-    original_ainvoke = getattr(tool, "ainvoke", None)
-    original_invoke = getattr(tool, "invoke", None)
-    original_arun = getattr(tool, "_arun", None)
-    original_run = getattr(tool, "_run", None)
     
-    if original_ainvoke:
-        async def new_ainvoke(*args, **kwargs):
-            res = await original_ainvoke(*args, **kwargs)
-            if hasattr(res, 'content'):
-                res.content = to_toon_format(res.content)
-                return res
-            return to_toon_format(res)
-        # Bind the function to the instance
-        tool.ainvoke = new_ainvoke.__get__(tool, type(tool))
-        
-    if original_invoke:
-        def new_invoke(*args, **kwargs):
-            res = original_invoke(*args, **kwargs)
-            if hasattr(res, 'content'):
-                res.content = to_toon_format(res.content)
-                return res
-            return to_toon_format(res)
-        tool.invoke = new_invoke.__get__(tool, type(tool))
-        
-    if original_arun:
-        async def new_arun(*args, **kwargs):
-            res = await original_arun(*args, **kwargs)
-            return to_toon_format(res)
-        tool._arun = new_arun.__get__(tool, type(tool))
-        
-    if original_run:
-        def new_run(*args, **kwargs):
-            res = original_run(*args, **kwargs)
-            return to_toon_format(res)
-        tool._run = new_run.__get__(tool, type(tool))
-        
-    return tool
+    async def async_wrapper(*args, **kwargs):
+        # Pass kwargs to the original tool's ainvoke
+        input_data = kwargs if kwargs else (args[0] if args else {})
+        res = await tool.ainvoke(input_data)
+        if hasattr(res, 'content'):
+            return to_toon_format(res.content)
+        return to_toon_format(res)
+
+    def sync_wrapper(*args, **kwargs):
+        input_data = kwargs if kwargs else (args[0] if args else {})
+        res = tool.invoke(input_data)
+        if hasattr(res, 'content'):
+            return to_toon_format(res.content)
+        return to_toon_format(res)
+
+    # Return a new StructuredTool that preserves the original schema
+    try:
+        return StructuredTool(
+            name=tool.name,
+            description=tool.description,
+            args_schema=tool.args_schema,
+            func=sync_wrapper,
+            coroutine=async_wrapper
+        )
+    except Exception:
+        # Fallback if StructuredTool instantiation fails
+        return tool
