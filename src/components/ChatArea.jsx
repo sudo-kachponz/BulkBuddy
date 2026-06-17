@@ -67,17 +67,6 @@ function UserBubble({ message }) {
 
 /* ── AI Message Bubble ── */
 function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet }) {
-  const spreadsheetOptions = [];
-  if (message.text && message.text.toLowerCase().includes('pilih spreadsheet mana yang ingin digunakan')) {
-    const lines = message.text.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^\d+\.\s+(.+)$/);
-      if (match) {
-        spreadsheetOptions.push(match[1].trim());
-      }
-    }
-  }
-
   return (
     <div className="flex items-start gap-3 msg-enter w-full">
       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shrink-0 shadow-sm">
@@ -105,16 +94,25 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
         )}
 
         {/* Spreadsheet Selection Buttons */}
-        {spreadsheetOptions.length > 0 && (
+        {message.sheetOptions && message.sheetOptions.length > 0 && (
           <div className="flex flex-col gap-2 mt-3">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-1">Pilih Spreadsheet:</span>
-            {spreadsheetOptions.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt)}
-                className="text-left px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
-                dangerouslySetInnerHTML={renderMarkdownHTML(`📄 ${opt}`)}
-              />
+            {message.sheetOptions.map((opt, idx) => (
+              <div key={idx} className="flex gap-2 w-full animate-in slide-in-from-bottom-2 fade-in">
+                {opt.url && (
+                  <a href={opt.url} target="_blank" rel="noreferrer" title="Buka di tab baru"
+                    className="flex-shrink-0 flex items-center justify-center px-3 py-2.5 bg-white border border-slate-200 text-primary-500 rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                    🔗 Link
+                  </a>
+                )}
+                <button
+                  onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)}
+                  className="flex-1 text-left px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl text-sm shadow-sm hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700 transition-colors flex flex-wrap gap-2 justify-between items-center cursor-pointer"
+                >
+                  <span className="truncate max-w-[200px]" title={opt.title}>📄 {opt.title}</span>
+                  {opt.date && <span className="text-[10px] text-slate-400 font-normal bg-slate-100 px-2 py-0.5 rounded-full whitespace-nowrap">{opt.date}</span>}
+                </button>
+              </div>
             ))}
           </div>
         )}

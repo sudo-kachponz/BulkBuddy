@@ -143,6 +143,7 @@ export default function App() {
       })
 
       let finalSpreadsheetData = null
+      let finalOptionsData = null
 
       while (true) {
         const { value, done } = await reader.read()
@@ -188,6 +189,7 @@ export default function App() {
                 // Live parse JSON array
                 const jsonStart = aiText.indexOf('```json');
                 let spreadsheetData = null;
+                let optionsData = null;
                 if (jsonStart !== -1) {
                   const jsonEnd = aiText.indexOf('```', jsonStart + 7);
                   let jsonStr = '';
@@ -200,10 +202,27 @@ export default function App() {
                   const objectMatches = jsonStr.match(/\{[^{}]+\}/g);
                   if (objectMatches) {
                     spreadsheetData = [];
+                    optionsData = [];
                     for (const obj of objectMatches) {
-                      try { spreadsheetData.push(JSON.parse(obj)); } catch (e) { }
+                      try { 
+                        const parsed = JSON.parse(obj);
+                        if (parsed.type === 'sheet_option' || parsed.url) {
+                          optionsData.push(parsed);
+                        } else {
+                          spreadsheetData.push(parsed);
+                        }
+                      } catch (e) { }
                     }
-                    finalSpreadsheetData = spreadsheetData
+                    if (spreadsheetData.length > 0) {
+                      finalSpreadsheetData = spreadsheetData;
+                    } else {
+                      spreadsheetData = null;
+                    }
+                    if (optionsData.length > 0) {
+                      finalOptionsData = optionsData;
+                    } else {
+                      optionsData = null;
+                    }
                   }
                 }
 
@@ -212,8 +231,21 @@ export default function App() {
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
                     updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
-                      updated[aiMessageIndex].spreadsheet = [...workingData, ...spreadsheetData];
+                      const mergedMap = new Map();
+                      workingData.forEach(r => mergedMap.set(String(r.id), r));
+                      spreadsheetData.forEach(r => {
+                        const rid = String(r.id);
+                        if (mergedMap.has(rid)) {
+                          mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
+                        } else {
+                          mergedMap.set(rid, r);
+                        }
+                      });
+                      updated[aiMessageIndex].spreadsheet = Array.from(mergedMap.values());
                       updated[aiMessageIndex].dataCards = spreadsheetData;
+                    }
+                    if (optionsData && optionsData.length > 0) {
+                      updated[aiMessageIndex].sheetOptions = optionsData;
                     }
                   }
                   return updated
@@ -257,7 +289,17 @@ export default function App() {
       setMessages(prev => {
         let finalWorkingData = workingData
         if (finalSpreadsheetData) {
-          finalWorkingData = [...workingData, ...finalSpreadsheetData]
+          const mergedMap = new Map();
+          workingData.forEach(r => mergedMap.set(String(r.id), r));
+          finalSpreadsheetData.forEach(r => {
+            const rid = String(r.id);
+            if (mergedMap.has(rid)) {
+              mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
+            } else {
+              mergedMap.set(rid, r);
+            }
+          });
+          finalWorkingData = Array.from(mergedMap.values());
           setWorkingData(finalWorkingData)
         }
         // Save state to backend asynchronously outside the render phase
@@ -303,10 +345,11 @@ export default function App() {
 SANGAT PENTING:
 1. Baca nama dengan ekstra teliti! Hati-hati dengan huruf N dan M, baca pelan-pelan (contoh: Firania, BUKAN Firama).
 2. NAMA NASABAH WAJIB DITULIS DALAM HURUF KAPITAL (CAPSLOCK) SEMUA.
-3. Kembalikan HANYA format JSON Array yang valid, sesuai dengan urutan baris data. 
+3. Ekstrak KOTA LAHIR dari bagian Tempat/Tgl Lahir dan masukkan ke dalam "kota_lhr".
+4. Kembalikan HANYA format JSON Array yang valid, sesuai dengan urutan baris data. 
 Format kunci (keys) harus sama persis dengan struktur ini:
 [
-  { "id": "1", "nama": "NAMA_NASABAH", "kelamin": "F/M", "tgl_lhr": "DDMMYYYY", "no_ktp": "16_DIGIT", "ibu_kandung": "NAMA_IBU", "handphone": "08XX", "alamat1": "ALAMAT", "kodepos": "12345", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
+  { "id": "${workingData.length + 1}", "nama": "NAMA_NASABAH", "kelamin": "F/M", "kota_lhr": "KOTA_LAHIR", "tgl_lhr": "DDMMYYYY", "no_ktp": "16_DIGIT", "ibu_kandung": "NAMA_IBU", "handphone": "08XX", "alamat1": "ALAMAT", "kodepos": "12345", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
 ]
 Dilarang memberikan kata-kata pengantar atau penutup. Berikan array JSON saja di dalam \`\`\`json blok.`
       }
@@ -572,10 +615,17 @@ Setelah selesai menduplikat, tolong tampilkan kalimat konfirmasi singkat bahwa s
 Tampilkan maksimal 3 spreadsheet terbaru yang cocok. 
 
 SANGAT PENTING: 
-1. Tampilkan hasilnya dalam bentuk list bernomor.
-2. JANGAN menggunakan format tabel (Markdown table) karena akan membuat UI error.
-3. Di bagian akhir balasannya, kamu WAJIB mengetik persis: "Silakan pilih spreadsheet mana yang ingin digunakan."
-4. Jangan lakukan tindakan modifikasi apapun pada sheet sebelum saya memilih.`;
+1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
+2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
+[
+  {
+    "type": "sheet_option",
+    "title": "SUTET-...",
+    "url": "https://docs.google.com/spreadsheets/d/...",
+    "date": "17/06/2026"
+  }
+]
+3. JANGAN LAKUKAN TINDAKAN MODIFIKASI APAPUN PADA SHEET.`;
                   handleSend({ text: prompt, files: [], previews: [] });
                 }}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#10B981] text-[#10B981] font-bold rounded-2xl shadow-lg hover:bg-[#10B981] hover:text-white hover:-translate-y-1 transition-all duration-300"
