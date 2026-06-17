@@ -48,6 +48,15 @@ async def generate_reports(req: ReportRequest):
     if not data:
         return {"error": "No data provided"}
 
+    # Prevent Excel from dropping leading zeros or using scientific notation
+    target_columns = ["No Telp Rumah", "No. Handphone", "NO KTP / PASSPORT", "NO IDENTITAS TAMBAHAN", "KODEPOS", "CIF_NO"]
+    for row in data:
+        for col in target_columns:
+            if col in row and row[col]:
+                val_str = str(row[col]).strip()
+                if val_str.isdigit():
+                    row[col] = f"'{val_str}"
+
     unique_id = str(uuid.uuid4())[:8]
     excel_path = f"/tmp/laporan_nasabah_{unique_id}.xlsx"
     pdf_path = f"/tmp/laporan_nasabah_{unique_id}.pdf"

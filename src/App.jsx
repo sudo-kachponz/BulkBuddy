@@ -204,7 +204,7 @@ export default function App() {
                     spreadsheetData = [];
                     optionsData = [];
                     for (const obj of objectMatches) {
-                      try { 
+                      try {
                         const parsed = JSON.parse(obj);
                         if (parsed.type === 'sheet_option' || parsed.url) {
                           optionsData.push(parsed);
