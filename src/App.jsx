@@ -7,6 +7,7 @@ import { MOCK_NASABAH, QUICK_ACTIONS } from './data/mockData'
 import mandiriLogo from './assets/bankmandiri_light.png'
 import mailIcon from './assets/mail.svg'
 import sheetIcon from './assets/sheet.svg'
+import { toSheetRow } from './data/schema'
 import { useChatHistory } from './hooks/useChatHistory'
 
 /* ── Helper: simulate AI delay ── */
@@ -36,15 +37,15 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [isTyping, setIsTyping] = useState(false)
   const [toast, setToast] = useState(null)
-  
+
   // Global table state
   const [workingData, setWorkingData] = useState([])
   const [activeSheetName, setActiveSheetName] = useState(null)
-  
+
   // Chat History via custom hook
   const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
-  
+
   // Refs to prevent duplicate creations and track sync state
   const activeSessionRef = useRef(null)
   const creatingSessionRef = useRef(false)
@@ -95,7 +96,7 @@ export default function App() {
   const streamAgentInvoke = async (promptText, images = [], actionType = 'chat') => {
     setIsTyping(true)
     let aiMessageIndex = -1
-    
+
     const thread_id = chatThreadIdRef.current
 
     try {
@@ -107,7 +108,7 @@ export default function App() {
         body: JSON.stringify({
           input: {
             messages: promptText,
-            context: "ATURAN WAJIB:\n- Jika membaca/mengekstrak data nasabah, WAJIB keluarkan dalam RAW JSON ARRAY (```json\n[{...}]\n```).\n- DILARANG KERAS menggunakan Tabel Markdown (| Field |) untuk data nasabah agar UI tidak crash.\n- Berikan pengantar singkat, lalu langsung blok JSON utuh.\n- SETELAH OCR/BACA DATA, wajib tanya: 'Ingin simpan ke Spreadsheet Baru atau yang Sudah Ada?'",
+            context: "ATURAN WAJIB MUTLAK: Jika Anda membaca, memanipulasi, atau mengeluarkan data nasabah, Anda WAJIB mengeluarkannya DALAM FORMAT JSON ARRAY SEPERTI INI: ```json\n[{ \"id\": \"1\", \"nama\": \"...\", \"kelamin\": \"...\", \"tgl_lhr\": \"...\", \"no_ktp\": \"...\", \"ibu_kandung\": \"...\", \"handphone\": \"...\", \"alamat1\": \"...\", \"kodepos\": \"...\", \"currency\": \"IDR\", \"produk\": \"TABMANDIRI\", \"kode_cabang\": 12000, \"consent\": \"YYYY\" }]\n``` SANGAT DILARANG MENGGUNAKAN TABEL MARKDOWN (| Field | Value |) UNTUK MERINGKAS ATAU MENAMPILKAN DATA NASABAH! JIKA KAMU MENGGUNAKAN TABEL MARKDOWN, SISTEM FRONTEND AKAN ERROR PARAH! Tulis kata pengantar biasa, lalu langsung berikan blok JSON utuh. KHUSUS JIKA SELESAI MENGEKSTRAK OCR GAMBAR ATAU MEMBACA DATA, tanyakan di akhir respons: 'Apakah Anda ingin menyimpan data ini ke Spreadsheet Baru atau menambahkannya ke Spreadsheet yang Sudah Ada?'",
             image_path: null,
             image_urls: images.length > 0 ? images : null
           },
@@ -166,7 +167,7 @@ export default function App() {
                 processed = processed.substring(0, jsonStart);
               }
             }
-            
+
             // SUPER AGGRESSIVE MARKDOWN TABLE REMOVER:
             processed = processed.replace(/^\|.*\|$/gm, '');
             processed = processed.replace(/^[-|:\s]+$/gm, '');
@@ -256,8 +257,8 @@ export default function App() {
       setMessages(prev => {
         let finalWorkingData = workingData
         if (finalSpreadsheetData) {
-           finalWorkingData = [...workingData, ...finalSpreadsheetData]
-           setWorkingData(finalWorkingData)
+          finalWorkingData = [...workingData, ...finalSpreadsheetData]
+          setWorkingData(finalWorkingData)
         }
         // Save state to backend asynchronously outside the render phase
         setTimeout(() => saveCurrentStateToBackend(prev, finalWorkingData), 0)
@@ -295,13 +296,14 @@ export default function App() {
 
     const hasFiles = files && files.length > 0
     let promptToSend = text;
-    
+
     if (hasFiles) {
       if (!promptToSend || promptToSend.trim() === '') {
         promptToSend = `Tolong ekstrasi NIK, Nama, Tempat Tanggal Lahir, Ibu Kandung, dan EC dari foto ini.
 SANGAT PENTING:
-Baca nama dengan ekstra teliti! Hati-hati dengan huruf N dan M, baca pelan-pelan (contoh: Firania, BUKAN Firama).
-Kembalikan HANYA format JSON Array yang valid, sesuai dengan urutan baris data. 
+1. Baca nama dengan ekstra teliti! Hati-hati dengan huruf N dan M, baca pelan-pelan (contoh: Firania, BUKAN Firama).
+2. NAMA NASABAH WAJIB DITULIS DALAM HURUF KAPITAL (CAPSLOCK) SEMUA.
+3. Kembalikan HANYA format JSON Array yang valid, sesuai dengan urutan baris data. 
 Format kunci (keys) harus sama persis dengan struktur ini:
 [
   { "id": "1", "nama": "NAMA_NASABAH", "kelamin": "F/M", "tgl_lhr": "DDMMYYYY", "no_ktp": "16_DIGIT", "ibu_kandung": "NAMA_IBU", "handphone": "08XX", "alamat1": "ALAMAT", "kodepos": "12345", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
@@ -437,10 +439,11 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     setMessages(prev => [...prev, userMsg])
 
     try {
+      const sheetRows = (rows || []).map(r => toSheetRow(r))
       const response = await fetch('http://localhost:8000/api/generate-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: rows || [], send_email: true, to_email: "neutracksudo@gmail.com" })
+        body: JSON.stringify({ data: sheetRows, send_email: true, to_email: "neutracksudo@gmail.com" })
       })
       const result = await response.json()
       if (result.error) throw new Error(result.error)
@@ -532,13 +535,59 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
 
         {/* Chat Area */}
         {isEmpty ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white/40 to-transparent">
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white/40 to-transparent overflow-y-auto">
             <InteractiveTutorial onQuickAction={handleQuickAction} />
+
+            {/* New Buttons for Sheet Flow */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-4 w-full max-w-2xl justify-center px-4 animate-in slide-in-from-bottom-4 fade-in">
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, '0');
+                  const mm = String(today.getMonth() + 1).padStart(2, '0');
+                  const yyyy = today.getFullYear();
+                  const sheetName = `SUTET-${dd}/${mm}/${yyyy}`;
+
+                  const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
+Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
+
+SANGAT PENTING:
+Setelah selesai menduplikat, tolong tampilkan kalimat konfirmasi singkat bahwa spreadsheet "${sheetName}" berhasil dibuat dan siap digunakan untuk input data nasabah baru. JANGAN memberikan tabel markdown.`;
+                  handleSend({ text: prompt, files: [], previews: [] });
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#1AC1DD] text-[#1AC1DD] font-bold rounded-2xl shadow-lg hover:bg-[#1AC1DD] hover:text-white hover:-translate-y-1 transition-all duration-300"
+              >
+                ✨ Buat Sheet Baru
+              </button>
+
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const dd = String(today.getDate()).padStart(2, '0');
+                  const mm = String(today.getMonth() + 1).padStart(2, '0');
+                  const yyyy = today.getFullYear();
+                  const dateStr = `${dd}/${mm}/${yyyy}`;
+
+                  const prompt = `Tolong cari spreadsheet di Google Drive yang mengandung kata "SUTET-${dateStr}".
+Tampilkan maksimal 3 spreadsheet terbaru yang cocok. 
+
+SANGAT PENTING: 
+1. Tampilkan hasilnya dalam bentuk list bernomor.
+2. JANGAN menggunakan format tabel (Markdown table) karena akan membuat UI error.
+3. Di bagian akhir balasannya, kamu WAJIB mengetik persis: "Silakan pilih spreadsheet mana yang ingin digunakan."
+4. Jangan lakukan tindakan modifikasi apapun pada sheet sebelum saya memilih.`;
+                  handleSend({ text: prompt, files: [], previews: [] });
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-[#10B981] text-[#10B981] font-bold rounded-2xl shadow-lg hover:bg-[#10B981] hover:text-white hover:-translate-y-1 transition-all duration-300"
+              >
+                🔍 Pakai Sheet Hari Ini
+              </button>
+            </div>
           </div>
         ) : (
-          <ChatArea 
-            messages={messages} 
-            isTyping={isTyping} 
+          <ChatArea
+            messages={messages}
+            isTyping={isTyping}
             onExportPdf={handleExportPdf}
             onSendCto={handleConfirmSend}
             onSaveToSheet={handleSaveToSheet}
@@ -555,9 +604,9 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
           const isModel = lastMsg?.role === 'model' || lastMsg?.role === 'ai';
           const hasText = lastMsg?.text || '';
           const matchesKeyword = /spreadsheet baru/i.test(hasText) || /sudah ada/i.test(hasText) || /menyimpan data ini/i.test(hasText);
-          
+
           if (isTyping || !isModel || !matchesKeyword) return null;
-          
+
           return (
             <div className="shrink-0 flex flex-wrap items-center justify-center gap-3 py-3 px-4 bg-white shadow-[0_-4px_15px_rgba(0,0,0,0.05)] border-t border-slate-100 z-20 w-full animate-in slide-in-from-bottom-2">
               <button

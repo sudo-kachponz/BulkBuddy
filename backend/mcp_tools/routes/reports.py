@@ -54,7 +54,36 @@ async def generate_reports(req: ReportRequest):
 
     # 1. Generate Excel using Pandas
     df = pd.DataFrame(data)
-    df.to_excel(excel_path, index=False)
+    try:
+        from openpyxl.styles import Font, PatternFill, Border, Side
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Sheet1')
+            worksheet = writer.sheets['Sheet1']
+            
+            header_font = Font(name='Arial', size=16, bold=True)
+            header_fill = PatternFill(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+            # Style header row
+            for cell in worksheet[1]:
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.border = thin_border
+                
+            # Resize columns and apply borders to all cells
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    cell.border = thin_border
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except:
+                        pass
+                worksheet.column_dimensions[column].width = max_length + 3
+    except ImportError:
+        df.to_excel(excel_path, index=False)
 
     # 2. Generate PDF using FPDF
     class PDF(FPDF):

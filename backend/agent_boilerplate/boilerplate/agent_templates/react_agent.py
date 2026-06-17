@@ -22,24 +22,17 @@ def get_react_agent(model_name="custom-vlm", temperature=0, langchain_tools=[], 
     # model_name = "anthropic/claude-sonnet-4.6" # for tools, one of the most general model
     model = get_llms(model_name, temperature)
     
-    def state_modifier(state):
-        messages = state["messages"]
-        # Sliding Window: Keep only the last 10 messages to save tokens
-        truncated_messages = messages[-10:] if len(messages) > 10 else messages
-        
-        # Compressed System Prompt
-        content = "You are a helpful AI assistant."
-        if langchain_tools:
-            content += "\n- ALWAYS use tools immediately when requested. DO NOT describe intent.\n- Format output clearly and concisely."
-            
-        # Ephemeral Prompt Caching for Anthropic
-        system_message = SystemMessage(
-            content=content,
-            additional_kwargs={"cache_control": {"type": "ephemeral"}}
-        )
-        return [system_message] + truncated_messages
+    # Create system prompt that encourages tool usage
+    if langchain_tools:
+        system_message = SystemMessage(content="""You are a helpful AI assistant with access to tools. 
+When a user asks you to do something that requires using a tool, you MUST call the appropriate tool function immediately.
+Do NOT just describe what you would do or say you'll call a function - actually invoke the tool by using the function calling mechanism.
+After receiving tool results, provide them to the user in a clear, helpful format.""")
+    else:
+        system_message = SystemMessage(content="You are a helpful AI assistant.")
     
-    return create_react_agent(model, langchain_tools, checkpointer=memory, state_modifier=state_modifier)
+    #return create_react_agent(model, langchain_tools, checkpointer=memory, state_modifier=system_message)
+    return create_react_agent(model, langchain_tools, checkpointer=memory, prompt=system_message)
 # Example usage
 if __name__ == "__main__":
     from langgraph.checkpoint.memory import MemorySaver

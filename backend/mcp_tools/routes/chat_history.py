@@ -84,15 +84,20 @@ async def create_session(
     user_id = get_user_id(request)
     thread_id = body.thread_id or str(uuid.uuid4())
 
-    # Auto-generate title from first message if not provided
+    # Auto-generate title based on date if not provided
     title = body.title
-    if not title and body.messages:
-        first_text = ""
-        for m in body.messages:
-            if m.get("role") == "user" and m.get("text"):
-                first_text = m["text"]
-                break
-        title = (first_text[:40] + "…") if len(first_text) > 40 else first_text or "Chat Baru"
+    if not title:
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        base_title = f"SUTET PLN - {today_str}"
+        try:
+            resp = supabase.table(TABLE).select("title").eq("user_id", user_id).like("title", f"{base_title}%").execute()
+            count = len(resp.data) if resp.data else 0
+            if count == 0:
+                title = base_title
+            else:
+                title = f"{base_title} ({count + 1})"
+        except Exception:
+            title = base_title
 
     payload = {
         "user_id": user_id,
@@ -162,13 +167,7 @@ async def update_session(
         payload["preview"] = body.preview
     if body.messages is not None:
         payload["messages"] = body.messages
-        # Auto-update title from latest user message if title not explicitly set
-        if body.title is None:
-            for m in reversed(body.messages):
-                if m.get("role") == "user" and m.get("text"):
-                    txt = m["text"]
-                    payload["title"] = (txt[:40] + "…") if len(txt) > 40 else txt
-                    break
+        # Auto-updating title from message is removed to preserve date-based titles
     if body.working_data is not None:
         payload["working_data"] = body.working_data
 
