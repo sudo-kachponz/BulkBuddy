@@ -186,8 +186,7 @@ async def generate_reports(req: ReportRequest):
         for col in target_columns:
             if col in row and row[col]:
                 val_str = str(row[col]).strip()
-                if val_str.isdigit():
-                    row[col] = f"'{val_str}"
+                row[col] = val_str
 
     unique_id = str(uuid.uuid4())[:8]
     excel_path = f"/tmp/laporan_nasabah_{unique_id}.xlsx"
@@ -226,35 +225,7 @@ async def generate_reports(req: ReportRequest):
     except ImportError:
         df.to_excel(excel_path, index=False)
 
-    # 2. Generate PDF using FPDF
-    class PDF(FPDF):
-        def header(self):
-            self.set_font("helvetica", "B", 12)
-            self.cell(0, 10, "Laporan Data Nasabah (BulkBuddy)", align="C")
-            self.ln(15)
 
-    pdf = PDF(orientation="L", unit="mm", format="A4")
-    pdf.add_page()
-    
-    columns = ["nama", "no_ktp", "kelamin", "tgl_lhr", "handphone", "produk", "kode_cabang"]
-    col_widths = [45, 45, 15, 25, 35, 30, 25]
-    
-    # Table Header
-    pdf.set_font("helvetica", "B", 8)
-    for i, col in enumerate(columns):
-        pdf.cell(col_widths[i], 8, str(col).upper(), border=1, align="C")
-    pdf.ln()
-
-    # Table Rows
-    pdf.set_font("helvetica", "", 8)
-    for row in data:
-        for i, col in enumerate(columns):
-            val = str(row.get(col, ""))[:25]
-            pdf.cell(col_widths[i], 8, val, border=1)
-        pdf.ln()
-
-    pdf.output(pdf_path)
-    
     if req.send_email:
         subject = "[Permohonan Pembukaan Rekening BULK Tabungan Reguler - PLN SUTET]"
         html_body = f"""
@@ -294,16 +265,14 @@ async def generate_reports(req: ReportRequest):
         Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.
         """
         try:
-            send_email_with_attachments(req.to_email, subject, html_body, [pdf_path, excel_path])
+            send_email_with_attachments(req.to_email, subject, html_body, [excel_path])
         except Exception as e:
             return {
                 "error": f"Failed to send email: {str(e)}. Please check your SMTP_USERNAME and SMTP_PASSWORD in .env.",
-                "excel_path": excel_path,
-                "pdf_path": pdf_path
+                "excel_path": excel_path
             }
 
     return {
         "message": "Reports generated and email sent successfully!" if req.send_email else "Reports generated",
-        "excel_path": excel_path,
-        "pdf_path": pdf_path
+        "excel_path": excel_path
     }

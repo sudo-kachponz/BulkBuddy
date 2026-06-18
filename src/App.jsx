@@ -460,7 +460,7 @@ Gunakan format list of objects persis seperti ini:
 ]
 \`\`\`
 
-Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di bawahnya, dan pada baris paling akhir, kamu HARUS menanyakan persis kalimat ini: 'Apa anda yakin mau mengirimkan PDF dan .excel ke gmail?'`;
+Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di bawahnya, dan pada baris paling akhir, kamu HARUS menanyakan persis kalimat ini: 'Apa anda yakin mau mengirimkan file excel ke gmail?'`;
       }
       await streamAgentInvoke(promptToSend, [])
     }
@@ -614,7 +614,7 @@ SANGAT PENTING:
   const handleConfirmSend = async (rows) => {
     showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
 
-    const userMsg = { role: 'user', text: 'Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
+    const userMsg = { role: 'user', text: 'Tolong buatkan dokumen Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
     setMessages(prev => [...prev, userMsg])
 
     try {
@@ -632,7 +632,7 @@ SANGAT PENTING:
       // Tambahkan response AI instan
       const aiMsg = {
         role: 'model',
-        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
+        text: `✅ **Selesai!**\n\nDokumen Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
       }
       setMessages(prev => {
         const newMsgs = [...prev, aiMsg]

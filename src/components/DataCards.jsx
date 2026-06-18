@@ -232,14 +232,7 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet, 
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
-        <button onClick={onExportPdf}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
-            bg-white border border-slate-200 text-slate-700 shadow-sm
-            hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700
-            active:scale-[0.97] transition-all duration-200">
-          <Download size={16} />
-          Export PDF
-        </button>
+
 
         <button onClick={() => onSendCto(rows)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
