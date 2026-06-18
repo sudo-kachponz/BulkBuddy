@@ -397,7 +397,19 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            langchain_tools = await client.get_tools()
+            # Retry get_tools() karena google-mcp butuh beberapa detik initialize
+            import asyncio
+            langchain_tools = None
+            for attempt in range(1, 4):
+                try:
+                    langchain_tools = await client.get_tools()
+                    break
+                except Exception as mcp_err:
+                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(mcp_err).__name__}: {mcp_err}")
+                    if attempt < 3:
+                        await asyncio.sleep(3)
+            if langchain_tools is None:
+                raise Exception("[MCP] Gagal mendapatkan tools setelah 3 percobaan. Cek log VPS untuk detail.")
             agent = get_react_agent(
                 model_name=model_name,
                 temperature=temperature,
@@ -496,7 +508,21 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            langchain_tools = await client.get_tools()
+            # Retry get_tools() karena google-mcp butuh beberapa detik initialize
+            import asyncio
+            langchain_tools = None
+            for attempt in range(1, 4):
+                try:
+                    langchain_tools = await client.get_tools()
+                    print(f"[MCP] get_tools() berhasil pada attempt {attempt}")
+                    break
+                except Exception as mcp_err:
+                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(mcp_err).__name__}: {mcp_err}")
+                    if attempt < 3:
+                        await asyncio.sleep(3)
+            if langchain_tools is None:
+                langchain_tools = []
+                print("[MCP] Semua attempt gagal, lanjut tanpa tools")
             
             if use_react_text:
                 print(f"Using ReAct text-based agent for {model_name}")
