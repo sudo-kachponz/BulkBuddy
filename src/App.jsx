@@ -500,7 +500,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
 
   const handleExistingSheet = useCallback(() => {
     handleSend({
-      text: `Tolong cari file spreadsheet di Google Drive yang bernama atau mengandung kata 'PLN SUTET'. 
+      text: `Gunakan tool Google MCP untuk mencari file spreadsheet di Google Drive yang bernama atau mengandung kata 'PLN SUTET'. 
 Tampilkan maksimal 3 spreadsheet terbaru yang cocok.
 
 SANGAT PENTING: 
@@ -510,10 +510,11 @@ SANGAT PENTING:
   {
     "type": "sheet_option",
     "title": "NAMA_FILE",
-    "url": "URL_FILE",
+    "url": "URL_ASLI_DARI_GOOGLE_DRIVE",
     "date": "TANGGAL_DIBUAT"
   }
 ]
+Pastikan "URL_ASLI_DARI_GOOGLE_DRIVE" diganti dengan URL asli yang didapat dari pencarian.
 3. JANGAN LAKUKAN TINDAKAN MODIFIKASI APAPUN PADA SHEET.`,
       displayText: "🔍 Cari Spreadsheet yang Sudah Ada",
       files: [], previews: []
@@ -591,20 +592,22 @@ SANGAT PENTING:
     const sheetName = `SUTET-${dd}/${mm}/${yyyy}-${time}`;
     setActiveSheetName(sheetName);
     const dateStr = `${dd}/${mm}/${yyyy}`;
-    const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
+    const prompt = `Gunakan tool Google MCP untuk mencari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
 WAJIB: Letakkan file hasil duplikat tersebut DI DALAM FOLDER YANG SAMA dengan lokasi template aslinya.
 Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
-SANGAT PENTING: 
+
+Setelah berhasil, SANGAT PENTING: 
 1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
 2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
 [
   {
     "type": "sheet_option",
     "title": "${sheetName}",
-    "url": "ISI_DENGAN_URL_SPREADSHEET_BARU",
+    "url": "<URL_ASLI_DARI_FILE_DUPLIKAT>",
     "date": "${dateStr}"
   }
-]`;
+]
+Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya dari file yang baru saja kamu duplikat.`;
     
     // Auto trigger
     setTimeout(() => {
