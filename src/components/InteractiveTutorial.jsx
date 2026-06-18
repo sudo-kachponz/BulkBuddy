@@ -215,12 +215,12 @@ export default function InteractiveTutorial({ onQuickAction }) {
           </div>
 
           {/* Bottom — Nav */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+          <div className="flex flex-col-reverse md:flex-row items-center justify-center md:justify-between mt-6 pt-4 border-t border-slate-100 gap-2 md:gap-0">
             <button
               onClick={goPrev}
               disabled={current === 0 || isAnimating}
-              className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200
-                ${current === 0 ? 'opacity-0 pointer-events-none' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+              className={`flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200 w-full md:w-auto
+                ${current === 0 ? 'hidden md:flex opacity-0 pointer-events-none' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 bg-slate-50 md:bg-transparent'}`}
             >
               ‹ Kembali
             </button>
@@ -229,7 +229,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
               <button
                 onClick={goNext}
                 disabled={isAnimating}
-                className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap"
+                className="flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2.5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap w-full md:w-auto"
                 style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
               >
                 Selanjutnya ›
@@ -238,7 +238,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
               <button
                 onClick={() => goTo(0)}
                 disabled={isAnimating}
-                className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap"
+                className="flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-2.5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap w-full md:w-auto"
                 style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
               >
                 Selesai (Ulangi)
