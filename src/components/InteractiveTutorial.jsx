@@ -124,7 +124,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col items-center gap-0 px-4 py-2 fade-in">
       {/* ── Header ── */}
-      <div className="flex flex-col items-center mb-5">
+      <div className="hidden md:flex flex-col items-center mb-5">
         <div
           className="hidden md:flex w-20 h-20 mb-3 rounded-[20px] overflow-hidden border-2 shadow-lg bg-white"
           style={{ borderColor: 'rgba(26,193,221,0.4)', boxShadow: '0 6px 24px rgba(26,193,221,0.4)' }}
@@ -151,8 +151,8 @@ export default function InteractiveTutorial({ onQuickAction }) {
       >
         {/* Left — Illustration */}
         <div
-          className="hidden md:flex flex-shrink-0 items-center justify-center w-[340px] p-6 relative"
-          style={{ background: slide.accentLight, minHeight: 220 }}
+          className="flex-shrink-0 flex items-center justify-center md:w-[340px] w-full p-4 md:p-6 relative"
+          style={{ background: slide.accentLight, minHeight: 180 }}
         >
           {/* Step badge */}
           <div
@@ -166,7 +166,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
             key={current}
             src={slide.illustration}
             alt={slide.title}
-            className={`w-full max-w-[260px] h-auto object-contain select-none transition-all duration-350
+            className={`w-full max-w-[160px] md:max-w-[260px] h-auto object-contain select-none transition-all duration-350
               ${isAnimating
                 ? animDir === 'next'
                   ? 'translate-x-8 opacity-0'
@@ -186,17 +186,12 @@ export default function InteractiveTutorial({ onQuickAction }) {
         >
           {/* Title block */}
           <div>
-            <div className="flex items-center gap-2 mb-1 md:mb-0">
-              <span className="md:hidden text-[10px] font-bold px-2 py-0.5 rounded shadow-sm text-white" style={{ background: slide.accent }}>
-                {slide.step}
-              </span>
-              <span
-                className="text-[11px] font-semibold uppercase tracking-widest"
-                style={{ color: slide.accent }}
-              >
-                {slide.pill}
-              </span>
-            </div>
+            <span
+              className="text-[11px] font-semibold uppercase tracking-widest"
+              style={{ color: slide.accent }}
+            >
+              {slide.pill}
+            </span>
             <h3 className="text-2xl font-extrabold text-slate-800 mt-1 leading-tight">
               {slide.title}
             </h3>
