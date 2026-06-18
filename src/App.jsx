@@ -107,7 +107,8 @@ export default function App() {
     const thread_id = chatThreadIdRef.current
 
     try {
-      const response = await fetch("http://localhost:8000/agent-invoke/fff649af-1f16-4027-9371-76a4d587096b/invoke-stream", {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/agent-invoke/fff649af-1f16-4027-9371-76a4d587096b/invoke-stream`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -530,7 +531,8 @@ SANGAT PENTING:
     
     try {
       // Kirim URL ke backend, jangan lupa di encode
-      const response = await fetch(`http://localhost:8000/api/get-sheet?sheet_name=${encodeURIComponent(sheetUrl)}`);
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/get-sheet?sheet_name=${encodeURIComponent(sheetUrl)}`);
       if (!response.ok) throw new Error("Gagal mengambil data dari Google Sheets");
       
       const result = await response.json();
@@ -633,7 +635,8 @@ SANGAT PENTING:
 
     try {
       const sheetRows = (rows || []).map(r => toSheetRow(r))
-      const response = await fetch('http://localhost:8000/api/generate-reports', {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/generate-reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: sheetRows, send_email: true, to_email: "neutracksudo@gmail.com" })
@@ -683,7 +686,8 @@ SANGAT PENTING:
 
     try {
       // Panggil endpoint murni di FastAPI (tanpa AI)
-      const response = await fetch('http://localhost:8000/api/update-sheet', {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/update-sheet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

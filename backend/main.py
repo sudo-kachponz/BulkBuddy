@@ -30,10 +30,13 @@ supabase_client: Client = create_client(supabase_url, supabase_key) if supabase_
 
 app = FastAPI(title="BulkBuddy Backend", description="Backend using agent_boilerplate to serve MCP agents.")
 
-# Add CORS Middleware to allow React frontend connection
+# Ambil URL frontend dari environment, jika tidak ada gunakan wildcard (*)
+# Saat deploy di Render nanti, kamu bisa tambahkan FRONTEND_URL dengan link Vercel kamu
+frontend_url = os.environ.get("FRONTEND_URL", "*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=[frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"] if frontend_url != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
