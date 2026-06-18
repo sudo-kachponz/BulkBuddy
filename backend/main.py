@@ -90,56 +90,38 @@ def setup_google_credentials():
 
 
 def setup_google_tokens():
-    """Generate access token from Service Account directly.
-    Ini solusi untuk VPS headless tanpa butuh OAuth atau browser sama sekali!
+    """Write tokens.json from env variable GOOGLE_REFRESH_TOKEN.
+    Ini solusi untuk VPS headless: daripada harus buka browser setiap token expired,
+    kita simpan refresh_token di .env dan regenerate tokens.json otomatis saat startup.
     """
     import json
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
     
-    # Baca dari file credentials.json di root project
-    root_dir = os.path.dirname(os.path.dirname(__file__))
-    sa_file = os.path.join(root_dir, "credentials.json")
+    if not refresh_token:
+        print("Info: GOOGLE_REFRESH_TOKEN not set in .env. Skipping tokens.json generation.")
+        return
     
-    if not os.path.exists(sa_file):
-        print(f"Info: {sa_file} tidak ditemukan. Pastikan sudah upload credentials.json service account ke VPS.")
+    if not client_id or not client_secret:
+        print("Warning: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing.")
         return
 
-    try:
-        from google.oauth2 import service_account
-        from google.auth.transport.requests import Request
-        
-        SCOPES = [
-            "https://www.googleapis.com/auth/documents",
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-            "https://www.googleapis.com/auth/tasks",
-            "https://www.googleapis.com/auth/calendar",
-            "https://www.googleapis.com/auth/gmail.modify",
-            "https://www.googleapis.com/auth/gmail.send",
-            "https://www.googleapis.com/auth/contacts",
-            "https://www.googleapis.com/auth/presentations",
-        ]
+    tokens_dir = os.path.expanduser("~/.local/share/google-mcp")
+    os.makedirs(tokens_dir, exist_ok=True)
+    tokens_path = os.path.join(tokens_dir, "tokens.json")
 
-        creds = service_account.Credentials.from_service_account_file(
-            sa_file, scopes=SCOPES
-        )
-        creds.refresh(Request())
-
-        tokens_dir = os.path.expanduser("~/.local/share/google-mcp")
-        os.makedirs(tokens_dir, exist_ok=True)
-        tokens_path = os.path.join(tokens_dir, "tokens.json")
-
-        tokens_data = {
-            "access_token": creds.token,
-            "token_type": "Bearer",
-            "expiry_date": int(creds.expiry.timestamp() * 1000) if creds.expiry else None,
-        }
-        
-        with open(tokens_path, 'w') as f:
-            json.dump(tokens_data, f, indent=2)
-            
-        print(f"[VPS Auth] Berhasil membuat tokens.json dari Service Account!")
-    except Exception as e:
-        print(f"[VPS Auth Error] Gagal setup service account token: {e}")
+    tokens_data = {
+        "access_token": "",
+        "refresh_token": refresh_token,
+        "scope": "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts https://www.googleapis.com/auth/presentations",
+        "token_type": "Bearer",
+        "expiry_date": 1000  # Force immediate refresh
+    }
+    
+    with open(tokens_path, 'w') as f:
+        json.dump(tokens_data, f, indent=2)
+    print(f"[VPS Auth] Berhasil membuat tokens.json dari GOOGLE_REFRESH_TOKEN!")
 
 @app.on_event("startup")
 async def startup_event():
