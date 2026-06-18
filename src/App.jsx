@@ -720,15 +720,19 @@ SANGAT PENTING:
       {/* Main Chat Panel */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md">
-          <div>
-            <h1 className="text-sm font-bold text-[#344054]">AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN</h1>
-            <p className="text-[11px] text-slate-400">PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0">
+          <div className="pr-20 md:pr-0 max-w-[85%] md:max-w-none">
+            <h1 className="text-[11px] md:text-sm font-bold text-[#344054] leading-snug md:leading-normal line-clamp-2 md:line-clamp-none">
+              AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN
+            </h1>
+            <p className="hidden md:block text-[11px] text-slate-400 mt-0.5">
+              PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION
+            </p>
           </div>
-          <div className="flex items-center gap-4 mr-32">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-emerald-600">Online</span>
+          <div className="flex items-center md:mr-32 self-start md:self-auto">
+            <div className="flex items-center gap-1.5 px-3 py-1 md:py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
+              <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] md:text-[11px] font-semibold text-emerald-600">Online</span>
             </div>
           </div>
         </div>
