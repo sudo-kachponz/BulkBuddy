@@ -722,8 +722,9 @@ SANGAT PENTING:
         {/* Top bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0">
           <div className="pr-20 md:pr-0 max-w-[85%] md:max-w-none">
-            <h1 className="text-[11px] md:text-sm font-bold text-[#344054] leading-snug md:leading-normal line-clamp-2 md:line-clamp-none">
-              AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN
+            <h1 className="text-[12px] md:text-sm font-bold text-[#344054] leading-snug md:leading-normal">
+              <span className="md:hidden">Asisten AI Pembuka Rekening</span>
+              <span className="hidden md:inline">AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN</span>
             </h1>
             <p className="hidden md:block text-[11px] text-slate-400 mt-0.5">
               PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION

@@ -126,13 +126,13 @@ export default function InteractiveTutorial({ onQuickAction }) {
       {/* ── Header ── */}
       <div className="flex flex-col items-center mb-5">
         <div
-          className="w-20 h-20 mb-3 rounded-[20px] overflow-hidden border-2 shadow-lg bg-white"
+          className="hidden md:flex w-20 h-20 mb-3 rounded-[20px] overflow-hidden border-2 shadow-lg bg-white"
           style={{ borderColor: 'rgba(26,193,221,0.4)', boxShadow: '0 6px 24px rgba(26,193,221,0.4)' }}
         >
           <img src={logoIcon} alt="BulkBuddy Logo" className="w-full h-full object-cover" />
         </div>
         <h2 className="text-xl font-bold text-slate-800 text-center leading-tight">
-          BulkBuddy — Asisten Pembuka Rekening
+          <span className="hidden md:inline">BulkBuddy — </span>Asisten Pembuka Rekening
         </h2>
         <p className="text-xs text-slate-400 text-center mt-1 max-w-xs">
           Ikuti 4 langkah di bawah untuk memproses batch pembukaan rekening nasabah
