@@ -101,7 +101,7 @@ function EditableCell({ value, onChange, isEditing, onStartEdit, onCommit, onCan
 }
 
 /* ── Compiled spreadsheet table (AI output) ── */
-export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }) {
+export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet, onUpdateWorkingData }) {
   const [rows, setRows] = useState(() => data.map(d => ({ ...d })))
   const [editCell, setEditCell] = useState(null)
   const [draft, setDraft] = useState('')
@@ -139,6 +139,7 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
     if (draft !== prev) {
       const updatedRows = rows.map((row, i) => i === rowIdx ? { ...row, [col]: draft } : row)
       setRows(updatedRows)
+      if (onUpdateWorkingData) onUpdateWorkingData(updatedRows)
       triggerAutoSave(updatedRows)
     }
     setEditCell(null)

@@ -67,7 +67,7 @@ function UserBubble({ message }) {
 }
 
 /* ── AI Message Bubble ── */
-function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet }) {
+function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet, onUpdateWorkingData }) {
   return (
     <div className="flex items-start gap-3 msg-enter w-full">
       <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shrink-0 shadow-sm">
@@ -148,6 +148,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
             onExportPdf={onExportPdf}
             onSendCto={onSendCto}
             onSaveToSheet={onSaveToSheet}
+            onUpdateWorkingData={onUpdateWorkingData}
           />
         )}
       </div>
@@ -156,7 +157,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
 }
 
 /* ── Main Chat Area ── */
-export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet }) {
+export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, onSaveToSheet, onConfirmSend, onNewSheet, onExistingSheet, onSelectExistingSheet, onUpdateWorkingData }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -169,7 +170,7 @@ export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, o
         {messages.map((msg, i) => (
           msg.role === 'user'
             ? <UserBubble key={i} message={msg} />
-            : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} onConfirmSend={onConfirmSend} onNewSheet={onNewSheet} onExistingSheet={onExistingSheet} onSelectExistingSheet={onSelectExistingSheet} />
+            : <AIBubble key={i} message={msg} onExportPdf={onExportPdf} onSendCto={onSendCto} onSaveToSheet={onSaveToSheet} onConfirmSend={onConfirmSend} onNewSheet={onNewSheet} onExistingSheet={onExistingSheet} onSelectExistingSheet={onSelectExistingSheet} onUpdateWorkingData={onUpdateWorkingData} />
         ))}
         {isTyping && <TypingIndicator />}
         <div ref={bottomRef} />

@@ -17,6 +17,12 @@ class ReportRequest(BaseModel):
     send_email: bool = False
     to_email: str = "neutracksudo@gmail.com"
 
+class UpdateSheetRequest(BaseModel):
+    sheet_name: str
+    data: List[Dict[str, Any]]
+    send_email: bool = False
+    to_email: str = "neutracksudo@gmail.com"
+
 def send_email_with_attachments(to_email: str, subject: str, html_body: str, file_paths: List[str]):
     smtp_user = os.environ.get("SMTP_USERNAME")
     smtp_pass = os.environ.get("SMTP_PASSWORD")
@@ -41,6 +47,53 @@ def send_email_with_attachments(to_email: str, subject: str, html_body: str, fil
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
+
+@router.post("/update-sheet")
+async def update_sheet_api(request: UpdateSheetRequest):
+    try:
+        columns_order = [
+            "nama", "gelarsbl", "gelarsdh", "kelamin", "tgl_lhr", "kota_lhr", 
+            "warga_negara", "no_ktp", "kota_ktp", "exp_ktp", "jenis_id_tambahan", 
+            "no_id_tambahan", "ibu_kandung", "sts_kawin", "alamat1", "alamat2", 
+            "kodepos", "telp_rumah", "handphone", "email", "pekerjaan", "jabatan", 
+            "employer_name", "kode_industri", "tgl_mulai", "gaji", "pen_lain", 
+            "cif_no", "currency", "produk", "biaya_admin", "tujuan_buka", 
+            "kode_cabang", "bansos_type", "consent"
+        ]
+        
+        sheet_values = []
+        for row in request.data:
+            formatted_row = [str(row.get(col, "")) for col in columns_order]
+            sheet_values.append(formatted_row)
+
+        try:
+            import gspread
+        except ImportError:
+            raise Exception("Library 'gspread' tidak ditemukan. Jalankan: pip install gspread google-auth")
+
+        # Pastikan file credentials.json (Service Account) ada di root folder
+        creds_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'credentials.json')
+        if not os.path.exists(creds_path):
+            raise Exception(f"File kredensial Service Account tidak ditemukan di {creds_path}. Silakan unduh dari Google Cloud Console dan simpan sebagai 'credentials.json' di folder root BulkBuddy.")
+
+        gc = gspread.service_account(filename=creds_path)
+        spreadsheet = gc.open(request.sheet_name)
+        worksheet = spreadsheet.sheet1
+        
+        # Hapus data lama (mulai dari baris 2 ke bawah, menyisakan header) dan timpa
+        worksheet.batch_clear(["A2:AI"]) 
+        
+        if sheet_values:
+            worksheet.update('A2', sheet_values)
+
+        return {"status": "success", "message": f"Data saved to {request.sheet_name} instantly!"}
+
+    except Exception as e:
+        print(f"Error updating sheet: {type(e).__name__} - {e}")
+        from fastapi import HTTPException
+        if "SpreadsheetNotFound" in str(type(e).__name__):
+            raise HTTPException(status_code=404, detail="Spreadsheet tidak ditemukan oleh Service Account. Pastikan file sudah di-share ke email bulkbuddy@animated-vector-434910-g3.iam.gserviceaccount.com")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate-reports")
 async def generate_reports(req: ReportRequest):

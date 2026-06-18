@@ -530,6 +530,7 @@ SANGAT PENTING:
     setActiveSheetName(sheetName);
     const dateStr = `${dd}/${mm}/${yyyy}`;
     const prompt = `Tolong cari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
+WAJIB: Letakkan file hasil duplikat tersebut DI DALAM FOLDER YANG SAMA dengan lokasi template aslinya.
 Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
 SANGAT PENTING: 
 1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
@@ -617,32 +618,34 @@ SANGAT PENTING:
   // We no longer use MCP Gmail directly because we need PDF and Excel attachments.
   // Instead, onSendCto is mapped to handleConfirmSend which hits the Python backend.
 
-  /* ── Save to Sheet via MCP (Auto-save, silent) ── */
+  /* ── Save to Sheet via Pure API (Auto-save, super cepat) ── */
   const handleSaveToSheet = async (updatedData) => {
-    const dataString = JSON.stringify(updatedData, null, 2)
-    const prompt = activeSheetName
-      ? `Tolong simpan/update data nasabah berikut ke spreadsheet yang sedang kita bahas/aktif yaitu '${activeSheetName}'. 
-SANGAT PENTING: 
-1. JANGAN buat spreadsheet baru. Tuliskan baris-baris data nasabah ini ke sheet tersebut.
-2. JANGAN BACA ISI SPREADSHEET TERLEBIH DAHULU. Langsung saja APPEND/Tambahkan data di bawah ini menggunakan tool yang tersedia.
-3. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET.
-4. Saat memanggil tool untuk append row, pastikan kamu mengirimkan array berisi TEPAT 35 elemen sesuai urutan kolom template berikut:
-[NAMA, GELARSBL, GELARSDH, KELAMIN, TGL_LHR, KOTA_LHR, WARGA NEGARA, NO KTP / PASSPORT, KOTA_KTP, EXP_KTP/PASSPORT, JENIS IDENTITAS TAMBAHAN, NO IDENTITAS TAMBAHAN, IBUKANDUNG, STS KAWIN, ALAMAT1, ALAMAT2, KODEPOS, No Telp Rumah, No. Handphone, EMAIL, PEKERJAAN, JABATAN, EMPLOYER NAME, KODE_INDUSTRI, TGL_MULAI, GAJI, PEN_LAIN, CIF_NO, CURRENCY, PRODUK, BIAYA ADMIN KHUSUS, TUJUAN BUKA REKENING, KODE CABANG, BANSOS TYPE, CONSENT]
-Kosongkan dengan string kosong ("") untuk nilai yang tidak ada di data JSON.
+    if (!activeSheetName) {
+      console.warn("Spreadsheet belum aktif/dibuat. Lewati auto-save.");
+      return;
+    }
 
-Data nasabah untuk ditambahkan: \n${dataString}`
-      : `Simpan data nasabah berikut ke Google Sheets. Jika spreadsheet belum ada, buat spreadsheet baru dengan nama 'Data Nasabah Mandiri BulkBuddy'.
-SANGAT PENTING: 
-1. JANGAN BACA ISI SPREADSHEET TERLEBIH DAHULU. Langsung saja APPEND/Tambahkan data di bawah ini.
-2. JANGAN LAKUKAN FORMATTING WARNA ATAU BACKGROUND PADA SPREADSHEET.
-3. Saat memanggil tool untuk append row, pastikan kamu mengirimkan array berisi TEPAT 35 elemen sesuai urutan kolom template berikut:
-[NAMA, GELARSBL, GELARSDH, KELAMIN, TGL_LHR, KOTA_LHR, WARGA NEGARA, NO KTP / PASSPORT, KOTA_KTP, EXP_KTP/PASSPORT, JENIS IDENTITAS TAMBAHAN, NO IDENTITAS TAMBAHAN, IBUKANDUNG, STS KAWIN, ALAMAT1, ALAMAT2, KODEPOS, No Telp Rumah, No. Handphone, EMAIL, PEKERJAAN, JABATAN, EMPLOYER NAME, KODE_INDUSTRI, TGL_MULAI, GAJI, PEN_LAIN, CIF_NO, CURRENCY, PRODUK, BIAYA ADMIN KHUSUS, TUJUAN BUKA REKENING, KODE CABANG, BANSOS TYPE, CONSENT]
-Kosongkan dengan string kosong ("") untuk nilai yang tidak ada di data JSON.
+    try {
+      // Panggil endpoint murni di FastAPI (tanpa AI)
+      const response = await fetch('http://localhost:8000/api/update-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet_name: activeSheetName,
+          data: updatedData
+        })
+      });
 
-Data nasabah untuk ditambahkan: \n${dataString}`
-
-    // Silent background save — no chat message added
-    await streamAgentInvoke(prompt, [], 'Simpan ke Sheets', true)
+      if (!response.ok) {
+        throw new Error('Gagal melakukan auto-save ke Google Sheets');
+      }
+      
+      // Auto-save berjalan di background secara silent.
+      console.log(`Auto-save ke ${activeSheetName} berhasil.`);
+      
+    } catch (error) {
+      console.error("Auto-save error:", error);
+    }
   }
 
   const isEmpty = messages.length === 0
@@ -699,6 +702,10 @@ Data nasabah untuk ditambahkan: \n${dataString}`
             onNewSheet={handleNewSheet}
             onExistingSheet={handleExistingSheet}
             onSelectExistingSheet={handleSelectExistingSheet}
+            onUpdateWorkingData={(newData) => {
+              setWorkingData(newData);
+              saveCurrentStateToBackend(messages, newData);
+            }}
           />
         )}
 
