@@ -73,6 +73,7 @@ def setup_google_credentials():
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
         "client_secret": client_secret,
         "redirect_uris": [
+            "http://localhost:3000/oauth2callback",
             "http://localhost:3001/oauth2callback",
             "http://localhost:3002/oauth2callback",
             "http://localhost:3003/oauth2callback",
@@ -87,12 +88,67 @@ def setup_google_credentials():
         json.dump(creds_data, f, indent=2)
     print(f"Generated Google MCP credentials at {creds_path}")
 
+
+def setup_google_tokens():
+    """Generate access token from Service Account directly.
+    Ini solusi untuk VPS headless tanpa butuh OAuth atau browser sama sekali!
+    """
+    import json
+    
+    # Baca dari file credentials.json di root project
+    root_dir = os.path.dirname(os.path.dirname(__file__))
+    sa_file = os.path.join(root_dir, "credentials.json")
+    
+    if not os.path.exists(sa_file):
+        print(f"Info: {sa_file} tidak ditemukan. Pastikan sudah upload credentials.json service account ke VPS.")
+        return
+
+    try:
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request
+        
+        SCOPES = [
+            "https://www.googleapis.com/auth/documents",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/tasks",
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/gmail.modify",
+            "https://www.googleapis.com/auth/gmail.send",
+            "https://www.googleapis.com/auth/contacts",
+            "https://www.googleapis.com/auth/presentations",
+        ]
+
+        creds = service_account.Credentials.from_service_account_file(
+            sa_file, scopes=SCOPES
+        )
+        creds.refresh(Request())
+
+        tokens_dir = os.path.expanduser("~/.local/share/google-mcp")
+        os.makedirs(tokens_dir, exist_ok=True)
+        tokens_path = os.path.join(tokens_dir, "tokens.json")
+
+        tokens_data = {
+            "access_token": creds.token,
+            "token_type": "Bearer",
+            "expiry_date": int(creds.expiry.timestamp() * 1000) if creds.expiry else None,
+        }
+        
+        with open(tokens_path, 'w') as f:
+            json.dump(tokens_data, f, indent=2)
+            
+        print(f"[VPS Auth] Berhasil membuat tokens.json dari Service Account!")
+    except Exception as e:
+        print(f"[VPS Auth Error] Gagal setup service account token: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     # Make supabase available in app.state for the routers
     app.state.supabase = supabase_client
     # Generate credentials for google-mcp
     setup_google_credentials()
+    # Inject tokens.json from GOOGLE_REFRESH_TOKEN env var (solusi headless VPS)
+    setup_google_tokens()
     
     # Start the MCP proxy manager to spawn background MCP servers
     print("Starting MCP proxy manager...")
