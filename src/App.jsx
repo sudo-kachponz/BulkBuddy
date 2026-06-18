@@ -335,7 +335,7 @@ export default function App() {
         setTimeout(() => {
           saveCurrentStateToBackend(prev, finalWorkingData)
           if (finalSpreadsheetData && finalSpreadsheetData.length > 0 && actionType === 'Input Form Fisik') {
-            handleSaveToSheet(finalSpreadsheetData)
+            handleSaveToSheet(finalWorkingData)
           }
         }, 0)
         return prev
@@ -502,15 +502,53 @@ SANGAT PENTING:
     })
   }, [handleSend])
 
-  const handleSelectExistingSheet = useCallback((sheetName) => {
+  const handleSelectExistingSheet = useCallback(async (sheetName) => {
     const cleanSheetName = sheetName.replace(/\*/g, '').trim()
     setActiveSheetName(cleanSheetName)
-    handleSend({
-      text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`,
-      displayText: `📄 Pakai spreadsheet: ${cleanSheetName}`,
-      files: [], previews: []
-    })
-  }, [handleSend])
+    
+    // UI Feedback
+    const userMsg = { role: 'user', text: `📄 Pakai spreadsheet: ${cleanSheetName}`, files: [], previews: [] }
+    setMessages(prev => [...prev, userMsg])
+    setIsTyping(true)
+    
+    try {
+      const response = await fetch(`http://localhost:8000/api/get-sheet?sheet_name=${encodeURIComponent(cleanSheetName)}`);
+      if (!response.ok) throw new Error("Gagal mengambil data dari Google Sheets");
+      
+      const result = await response.json();
+      const sheetData = result.data || [];
+      
+      setWorkingData(sheetData);
+      
+      const aiMsg = { 
+        role: 'model', 
+        text: `✅ **Berhasil terhubung ke Spreadsheet!**\n\nSpreadsheet **${cleanSheetName}** telah aktif dan isinya berhasil dimuat. Anda bisa melanjutkan upload form fisik nasabah, dan data akan otomatis ditambahkan ke file ini.`
+      };
+      
+      setMessages(prev => {
+        const updated = [...prev, aiMsg]
+        setTimeout(() => saveCurrentStateToBackend(updated, sheetData), 0)
+        return updated
+      })
+      
+      showToast(`Berhasil memuat ${sheetData.length} baris data dari ${cleanSheetName}`, 'success')
+      
+    } catch (e) {
+      console.error(e)
+      const aiMsg = { 
+        role: 'model', 
+        text: `❌ **Gagal memuat Spreadsheet**\n\nPesan Error: \`${e.message}\`\nPastikan file sudah di-share ke email Service Account.`
+      };
+      setMessages(prev => {
+        const updated = [...prev, aiMsg]
+        setTimeout(() => saveCurrentStateToBackend(updated, []), 0)
+        return updated
+      })
+      showToast(e.message, 'error')
+    } finally {
+      setIsTyping(false)
+    }
+  }, [messages, workingData, activeSession])
 
   /* ── New chat (Auto-creates Sheet) ── */
   const handleNewChat = () => {

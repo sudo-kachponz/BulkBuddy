@@ -95,6 +95,53 @@ async def update_sheet_api(request: UpdateSheetRequest):
             raise HTTPException(status_code=404, detail="Spreadsheet tidak ditemukan oleh Service Account. Pastikan file sudah di-share ke email bulkbuddy@animated-vector-434910-g3.iam.gserviceaccount.com")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/get-sheet")
+async def get_sheet_api(sheet_name: str):
+    try:
+        import gspread
+        creds_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'credentials.json')
+        gc = gspread.service_account(filename=creds_path)
+        spreadsheet = gc.open(sheet_name)
+        worksheet = spreadsheet.sheet1
+        
+        # Ambil semua data
+        all_values = worksheet.get_all_values()
+        if len(all_values) <= 1:
+            return {"status": "success", "data": []}
+            
+        columns_order = [
+            "nama", "gelarsbl", "gelarsdh", "kelamin", "tgl_lhr", "kota_lhr", 
+            "warga_negara", "no_ktp", "kota_ktp", "exp_ktp", "jenis_id_tambahan", 
+            "no_id_tambahan", "ibu_kandung", "sts_kawin", "alamat1", "alamat2", 
+            "kodepos", "telp_rumah", "handphone", "email", "pekerjaan", "jabatan", 
+            "employer_name", "kode_industri", "tgl_mulai", "gaji", "pen_lain", 
+            "cif_no", "currency", "produk", "biaya_admin", "tujuan_buka", 
+            "kode_cabang", "bansos_type", "consent"
+        ]
+        
+        # Lewati header (baris pertama)
+        rows = all_values[1:]
+        
+        data = []
+        for idx, row in enumerate(rows):
+            row_dict = {"id": str(idx + 1)}
+            for col_idx, col_name in enumerate(columns_order):
+                val = row[col_idx] if col_idx < len(row) else ""
+                # Hapus tanda kutip ('08...) yang ditambahkan saat write
+                if val.startswith("'"):
+                    val = val[1:]
+                row_dict[col_name] = val
+            data.append(row_dict)
+            
+        return {"status": "success", "data": data}
+        
+    except Exception as e:
+        print(f"Error getting sheet: {type(e).__name__} - {e}")
+        from fastapi import HTTPException
+        if "SpreadsheetNotFound" in str(type(e).__name__):
+            raise HTTPException(status_code=404, detail="Spreadsheet tidak ditemukan oleh Service Account.")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/generate-reports")
 async def generate_reports(req: ReportRequest):
     data = req.data
