@@ -83,7 +83,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
         )}
 
         {/* Confirmation Button */}
-        {message.text && message.text.toLowerCase().includes('apa anda yakin mau mengirimkan pdf dan .excel ke gmail?') && (
+        {message.text && message.text.toLowerCase().includes('apa anda yakin mau mengirimkan file excel ke gmail?') && (
           <div className="mt-3">
             <button
               onClick={() => onConfirmSend(message.spreadsheet)}
