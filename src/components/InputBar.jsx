@@ -102,7 +102,7 @@ export default function InputBar({ onSend, disabled }) {
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ketik pesan atau lampirkan form fisik..."
+            placeholder="Ketik pesan..."
             rows={1}
             disabled={disabled}
             className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-800

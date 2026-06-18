@@ -220,7 +220,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
             <button
               onClick={goPrev}
               disabled={current === 0 || isAnimating}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+              className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200
                 ${current === 0 ? 'opacity-0 pointer-events-none' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               ‹ Kembali
@@ -230,7 +230,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
               <button
                 onClick={goNext}
                 disabled={isAnimating}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap"
                 style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
               >
                 Selanjutnya ›
@@ -239,7 +239,7 @@ export default function InteractiveTutorial({ onQuickAction }) {
               <button
                 onClick={() => goTo(0)}
                 disabled={isAnimating}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                className="flex items-center gap-1 md:gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97] whitespace-nowrap"
                 style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
               >
                 Selesai (Ulangi)
