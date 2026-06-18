@@ -178,34 +178,27 @@ class AgentBoilerplate:
                     
                     if latest_version.get("released"):
                         tool_name = tool.get("name", "unknown_tool")
-                        transport_type = released_config.get("transport", "sse")
-                        if transport_type == "stdio":
-                            # Use stdio transport directly
+                        released_config = latest_version.get("released", {})
+                        port = released_config.get("port", "10001")
+                        
+                        url = f"http://localhost:{port}/sse"
+                        
+                        # REDIRECT HACK: Synchronize Agent Client with MCP Manager
+                        # The Manager forces Supabase to 10399 to avoid conflicts, but Config says 10396.
+                        if "Supabase" in tool_name and str(port) == "10396":
+                             url = "http://localhost:10399/sse"
+                             print(f"🔄 Redirected {tool_name} connection: 10396 -> 10399 (Manager Port)")
+                        
+                        # Validate if the server is actually running
+                        if self._is_server_reachable(url):
+                            # Create tool configuration
                             mcp_config[tool_name] = {
-                                "command": released_config.get("command", "npx"),
-                                "args": released_config.get("args", []),
-                                "transport": "stdio"
+                                "url": url,
+                                "transport": released_config.get("transport", "sse"),
                             }
                             has_tools = True
-                            print(f"🔧 Configured tool '{tool_name}' via stdio")
                         else:
-                            port = released_config.get("port", "10001")
-                            url = f"http://localhost:{port}/sse"
-                            
-                            # REDIRECT HACK: Synchronize Agent Client with MCP Manager
-                            if "Supabase" in tool_name and str(port) == "10396":
-                                 url = "http://localhost:10399/sse"
-                                 print(f"🔄 Redirected {tool_name} connection: 10396 -> 10399 (Manager Port)")
-                            
-                            # Validate if the server is actually running
-                            if self._is_server_reachable(url):
-                                mcp_config[tool_name] = {
-                                    "url": url,
-                                    "transport": transport_type,
-                                }
-                                has_tools = True
-                            else:
-                                print(f"⚠️ Skipping tool '{tool_name}' because server at {url} is unreachable.")
+                            print(f"⚠️ Skipping tool '{tool_name}' because server at {url} is unreachable.")
 
                         # # Add or update all environment variables from the config's env
                         # if "env" in released_config:
@@ -524,13 +517,7 @@ class AgentBoilerplate:
                     print(f"[MCP] get_tools() berhasil pada attempt {attempt}")
                     break
                 except Exception as mcp_err:
-                    # Unwrap ExceptionGroup untuk lihat error sesungguhnya
-                    inner = mcp_err
-                    if hasattr(mcp_err, 'exceptions') and mcp_err.exceptions:
-                        inner = mcp_err.exceptions[0]
-                        if hasattr(inner, 'exceptions') and inner.exceptions:
-                            inner = inner.exceptions[0]
-                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(inner).__name__}: {inner}")
+                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(mcp_err).__name__}: {mcp_err}")
                     if attempt < 3:
                         await asyncio.sleep(3)
             if langchain_tools is None:
