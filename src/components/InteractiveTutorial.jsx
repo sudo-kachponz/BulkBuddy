@@ -25,7 +25,6 @@ const SLIDES = [
     accentLight: 'rgba(26,193,221,0.08)',
     pill: 'Upload',
     pillColor: '#1AC1DD',
-    action: null,
   },
   {
     id: 2,
@@ -43,7 +42,6 @@ const SLIDES = [
     accentLight: 'rgba(16,185,129,0.08)',
     pill: 'Sheets',
     pillColor: '#10B981',
-    action: { label: 'Mulai Input Data', msg: 'Saya ingin input data nasabah baru dari form fisik.' },
   },
   {
     id: 3,
@@ -61,7 +59,6 @@ const SLIDES = [
     accentLight: 'rgba(99,102,241,0.08)',
     pill: 'Review',
     pillColor: '#6366F1',
-    action: null,
   },
   {
     id: 4,
@@ -79,7 +76,6 @@ const SLIDES = [
     accentLight: 'rgba(245,158,11,0.08)',
     pill: 'Kirim',
     pillColor: '#F59E0B',
-    action: { label: 'Kirim Email ke CTO', msg: 'Tolong kirim email batch ke CTO untuk pembukaan rekening.' },
   },
 ]
 
@@ -219,38 +215,34 @@ export default function InteractiveTutorial({ onQuickAction }) {
             </ul>
           </div>
 
-          {/* Bottom — Nav + Action */}
-          <div className="flex items-center justify-between mt-6 flex-wrap gap-3">
-            {/* Prev / Next */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={goPrev}
-                disabled={current === 0 || isAnimating}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm font-bold transition-all duration-200
-                  ${current === 0 ? 'opacity-30 cursor-not-allowed border-slate-200 text-slate-300' : 'border-slate-300 text-slate-600 hover:bg-slate-100 hover:scale-105'}`}
-              >
-                ‹
-              </button>
+          {/* Bottom — Nav */}
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+            <button
+              onClick={goPrev}
+              disabled={current === 0 || isAnimating}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+                ${current === 0 ? 'opacity-0 pointer-events-none' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+            >
+              ‹ Kembali
+            </button>
+
+            {current < SLIDES.length - 1 ? (
               <button
                 onClick={goNext}
-                disabled={current === SLIDES.length - 1 || isAnimating}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm font-bold transition-all duration-200
-                  ${current === SLIDES.length - 1 ? 'opacity-30 cursor-not-allowed border-slate-200 text-slate-300' : 'border-slate-300 text-slate-600 hover:bg-slate-100 hover:scale-105'}`}
-              >
-                ›
-              </button>
-            </div>
-
-            {/* Action button */}
-            {slide.action && (
-              <button
-                onClick={() => onQuickAction(slide.action.msg)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white shadow-md transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                disabled={isAnimating}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
                 style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
               >
-                {slide.id === 2 && <img src={sheetsIcon} alt="" className="w-4 h-4 object-contain" />}
-                {slide.id === 4 && <img src={mailIcon} alt="" className="w-4 h-4 object-contain" />}
-                {slide.action.label}
+                Selanjutnya ›
+              </button>
+            ) : (
+              <button
+                onClick={() => goTo(0)}
+                disabled={isAnimating}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                style={{ background: `linear-gradient(135deg, ${slide.accent}, ${slide.accent}cc)` }}
+              >
+                Selesai (Ulangi)
               </button>
             )}
           </div>
