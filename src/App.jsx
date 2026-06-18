@@ -747,45 +747,44 @@ SANGAT PENTING:
           </div>
         </div>
 
-        {/* Chat Area */}
-        {isEmpty ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white/40 to-transparent overflow-y-auto">
-            <InteractiveTutorial onQuickAction={handleQuickAction} />
+        {/* Chat Area & Input Bar Wrapper */}
+        <div className={`flex-1 flex flex-col min-w-0 min-h-0 transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto' : 'opacity-100'}`}>
+          {/* Chat Area */}
+          {isEmpty ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white/40 to-transparent overflow-y-auto">
+              <InteractiveTutorial onQuickAction={handleQuickAction} />
+            </div>
+          ) : (
+            <ChatArea
+              messages={messages}
+              isTyping={isTyping}
+              onExportPdf={handleExportPdf}
+              onSendCto={handleConfirmSend}
+              onSaveToSheet={handleSaveToSheet}
+              onConfirmSend={handleConfirmSend}
+              onNewSheet={handleNewSheet}
+              onExistingSheet={handleExistingSheet}
+              onSelectExistingSheet={handleSelectExistingSheet}
+              onUpdateWorkingData={(newData) => {
+                setWorkingData(newData);
+                
+                // Update juga data spreadsheet di chat bubble terakhir agar sinkron
+                setMessages(prev => {
+                  const updatedMsgs = [...prev];
+                  const lastAiIndex = updatedMsgs.findLastIndex(msg => msg.role === 'model' || msg.role === 'ai');
+                  if (lastAiIndex !== -1 && updatedMsgs[lastAiIndex].spreadsheet) {
+                    updatedMsgs[lastAiIndex].spreadsheet = newData;
+                  }
+                  saveCurrentStateToBackend(updatedMsgs, newData);
+                  return updatedMsgs;
+                });
+              }}
+            />
+          )}
 
-            {/* Homepage buttons removed per 1 Session = 1 Spreadsheet flow */}
-          </div>
-        ) : (
-          <ChatArea
-            messages={messages}
-            isTyping={isTyping}
-            onExportPdf={handleExportPdf}
-            onSendCto={handleConfirmSend}
-            onSaveToSheet={handleSaveToSheet}
-            onConfirmSend={handleConfirmSend}
-            onNewSheet={handleNewSheet}
-            onExistingSheet={handleExistingSheet}
-            onSelectExistingSheet={handleSelectExistingSheet}
-            onUpdateWorkingData={(newData) => {
-              setWorkingData(newData);
-              
-              // Update juga data spreadsheet di chat bubble terakhir agar sinkron
-              setMessages(prev => {
-                const updatedMsgs = [...prev];
-                const lastAiIndex = updatedMsgs.findLastIndex(msg => msg.role === 'model' || msg.role === 'ai');
-                if (lastAiIndex !== -1 && updatedMsgs[lastAiIndex].spreadsheet) {
-                  updatedMsgs[lastAiIndex].spreadsheet = newData;
-                }
-                saveCurrentStateToBackend(updatedMsgs, newData);
-                return updatedMsgs;
-              });
-            }}
-          />
-        )}
-
-        {/* Chat Recommendations dihapus (1 Session = 1 Spreadsheet) */}
-
-        {/* Input bar */}
-        <InputBar onSend={handleSend} disabled={isTyping} />
+          {/* Input bar */}
+          <InputBar onSend={handleSend} disabled={isTyping} />
+        </div>
       </div>
     </div>
   )
