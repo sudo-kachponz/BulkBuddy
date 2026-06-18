@@ -141,18 +141,17 @@ export default function InteractiveTutorial({ onQuickAction }) {
 
       {/* ── Slide Card ── */}
       <div
-        className="w-full rounded-3xl border overflow-hidden flex flex-col md:flex-row"
+        className="w-full rounded-3xl border overflow-hidden flex flex-col md:flex-row min-h-0 md:min-h-[340px]"
         style={{
           background: '#fff',
           borderColor: `${slide.accent}30`,
           boxShadow: `0 8px 40px ${slide.accent}18`,
-          minHeight: 340,
           transition: 'box-shadow 0.4s, border-color 0.4s',
         }}
       >
         {/* Left — Illustration */}
         <div
-          className="flex-shrink-0 flex items-center justify-center md:w-[340px] w-full p-6 relative"
+          className="hidden md:flex flex-shrink-0 items-center justify-center w-[340px] p-6 relative"
           style={{ background: slide.accentLight, minHeight: 220 }}
         >
           {/* Step badge */}
@@ -181,18 +180,23 @@ export default function InteractiveTutorial({ onQuickAction }) {
 
         {/* Right — Content */}
         <div
-          className={`flex-1 flex flex-col justify-between p-7 transition-all duration-350
+          className={`flex-1 flex flex-col justify-between p-5 md:p-7 transition-all duration-350
             ${isAnimating ? 'opacity-0 translate-x-3' : 'opacity-100 translate-x-0'}`}
           style={{ transition: 'opacity 0.35s, transform 0.35s' }}
         >
           {/* Title block */}
           <div>
-            <span
-              className="text-[11px] font-semibold uppercase tracking-widest"
-              style={{ color: slide.accent }}
-            >
-              {slide.pill}
-            </span>
+            <div className="flex items-center gap-2 mb-1 md:mb-0">
+              <span className="md:hidden text-[10px] font-bold px-2 py-0.5 rounded shadow-sm text-white" style={{ background: slide.accent }}>
+                {slide.step}
+              </span>
+              <span
+                className="text-[11px] font-semibold uppercase tracking-widest"
+                style={{ color: slide.accent }}
+              >
+                {slide.pill}
+              </span>
+            </div>
             <h3 className="text-2xl font-extrabold text-slate-800 mt-1 leading-tight">
               {slide.title}
             </h3>
