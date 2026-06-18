@@ -730,7 +730,7 @@ SANGAT PENTING:
           <div className={`absolute top-2.5 right-4 md:right-5 z-50 pointer-events-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <img src={mandiriLogo} alt="Bank Mandiri" className="h-6 md:h-8 object-contain" />
           </div>
-          <div className="pr-20 md:pr-0 max-w-[85%] md:max-w-none">
+          <div className={`pr-20 md:pr-0 max-w-[85%] md:max-w-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <h1 className="text-[12px] md:text-sm font-bold text-[#344054] leading-snug md:leading-normal">
               <span className="md:hidden">Asisten AI Pembuka Rekening</span>
               <span className="hidden md:inline">AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN</span>
@@ -739,7 +739,7 @@ SANGAT PENTING:
               PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION
             </p>
           </div>
-          <div className="flex items-center md:mr-32 self-start md:self-auto">
+          <div className={`flex items-center md:mr-32 self-start md:self-auto transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <div className="flex items-center gap-1.5 px-3 py-1 md:py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-[10px] md:text-[11px] font-semibold text-emerald-600">Online</span>

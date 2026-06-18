@@ -155,7 +155,7 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet, 
         <img src={sheetsIcon} alt="Sheets" className="w-6 h-6 object-contain" />
         <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {rows.length} Nasabah</span>
         <span className="hidden md:inline text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
-        <span className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all duration-300
+        <span className={`hidden md:flex ml-auto items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all duration-300
           ${saveStatus === 'saving' ? 'text-amber-600 bg-amber-50 border border-amber-200 animate-pulse' :
             saveStatus === 'saved' ? 'text-emerald-600 bg-emerald-50 border border-emerald-200' :
             'text-slate-400 bg-slate-50 border border-slate-200'}">
