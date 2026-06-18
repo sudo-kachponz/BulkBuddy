@@ -4,7 +4,7 @@ import sheetIcon from '../assets/sheet.svg'
 
 export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat }) {
   return (
-    <aside className={`relative flex flex-col bg-white/90 backdrop-blur-md border-r border-slate-200/70 transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-72'}`}>
+    <aside className={`relative flex flex-col bg-white/90 backdrop-blur-md border-r border-slate-200/70 transition-all duration-300 ease-in-out z-[60] ${collapsed ? 'w-16' : 'w-72'}`}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm shrink-0">

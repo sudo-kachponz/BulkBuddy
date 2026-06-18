@@ -33,7 +33,14 @@ function Toast({ toast, onClose }) {
    ═  MAIN APP
    ══════════════════════════════════════════ */
 export default function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+
+  useEffect(() => {
+    if (window.innerWidth >= 768) {
+      setSidebarCollapsed(false)
+    }
+  }, [])
+
   const [messages, setMessages] = useState([])
   const [isTyping, setIsTyping] = useState(false)
   const [toast, setToast] = useState(null)
