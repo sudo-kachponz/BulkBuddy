@@ -727,7 +727,7 @@ SANGAT PENTING:
         <div className="relative flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0">
           
           {/* Mandiri Logo — absolute inside Top bar so it moves with the panel */}
-          <div className="absolute top-2.5 right-4 md:right-5 z-50 pointer-events-none">
+          <div className={`absolute top-2.5 right-4 md:right-5 z-50 pointer-events-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <img src={mandiriLogo} alt="Bank Mandiri" className="h-6 md:h-8 object-contain" />
           </div>
           <div className="pr-20 md:pr-0 max-w-[85%] md:max-w-none">
