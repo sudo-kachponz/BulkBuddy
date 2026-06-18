@@ -108,12 +108,10 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet, 
   const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved'
   const autoSaveTimerRef = useRef(null)
 
-  // Update rows if new data streams in (length changes)
+  // Update rows if new data streams in OR if content changes
   useEffect(() => {
-    if (data.length !== rows.length) {
-      setRows(data.map(d => ({ ...d })))
-    }
-  }, [data.length])
+    setRows(data.map(d => ({ ...d })))
+  }, [JSON.stringify(data)])
 
   // Auto-save with debounce whenever rows change
   const triggerAutoSave = (updatedRows) => {

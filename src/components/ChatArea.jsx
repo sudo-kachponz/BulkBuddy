@@ -104,7 +104,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
                 .map((opt, idx) => (
                 <div key={idx} className="flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-primary-300 transition-all group animate-in slide-in-from-bottom-2 fade-in">
                   <button
-                    onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)}
+                    onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt)}
                     className="p-3 pb-0 text-left cursor-pointer flex-1"
                   >
                     <div className="w-full h-24 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200/50 flex items-center justify-center mb-3">
@@ -116,7 +116,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
                     <p className="text-[11px] text-slate-400 mt-1 px-1">Google Sheets • {opt.date || 'Terbaru'}</p>
                   </button>
                   <div className="p-3 pt-3 mt-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <button onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt.title)} className="text-xs font-bold text-primary-600 hover:text-primary-700 cursor-pointer bg-primary-50 px-3 py-1.5 rounded-lg transition-colors">
+                    <button onClick={() => onSelectExistingSheet && onSelectExistingSheet(opt)} className="text-xs font-bold text-primary-600 hover:text-primary-700 cursor-pointer bg-primary-50 px-3 py-1.5 rounded-lg transition-colors">
                       Pilih & Pakai Ini
                     </button>
                     {opt.url && (

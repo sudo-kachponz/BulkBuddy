@@ -77,7 +77,13 @@ async def update_sheet_api(request: UpdateSheetRequest):
             raise Exception(f"File kredensial Service Account tidak ditemukan di {creds_path}. Silakan unduh dari Google Cloud Console dan simpan sebagai 'credentials.json' di folder root BulkBuddy.")
 
         gc = gspread.service_account(filename=creds_path)
-        spreadsheet = gc.open(request.sheet_name)
+        
+        # Cek apakah yang dikirim FE adalah URL atau sekadar nama file
+        if "docs.google.com/spreadsheets" in request.sheet_name:
+             spreadsheet = gc.open_by_url(request.sheet_name)
+        else:
+             spreadsheet = gc.open(request.sheet_name)
+             
         worksheet = spreadsheet.sheet1
         
         # Hapus data lama (mulai dari baris 2 ke bawah, menyisakan header) dan timpa
@@ -101,7 +107,15 @@ async def get_sheet_api(sheet_name: str):
         import gspread
         creds_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'credentials.json')
         gc = gspread.service_account(filename=creds_path)
-        spreadsheet = gc.open(sheet_name)
+        
+        import urllib.parse
+        decoded_name = urllib.parse.unquote(sheet_name)
+
+        if "docs.google.com/spreadsheets" in decoded_name:
+             spreadsheet = gc.open_by_url(decoded_name)
+        else:
+             spreadsheet = gc.open(decoded_name)
+             
         worksheet = spreadsheet.sheet1
         
         # Ambil semua data

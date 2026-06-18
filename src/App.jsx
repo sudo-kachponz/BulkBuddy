@@ -502,17 +502,21 @@ SANGAT PENTING:
     })
   }, [handleSend])
 
-  const handleSelectExistingSheet = useCallback(async (sheetName) => {
-    const cleanSheetName = sheetName.replace(/\*/g, '').trim()
-    setActiveSheetName(cleanSheetName)
+  const handleSelectExistingSheet = useCallback(async (sheetOption) => {
+    // sheetOption sekarang adalah object { title: "...", url: "..." }
+    const sheetName = sheetOption.title ? sheetOption.title.replace(/\*/g, '').trim() : "Spreadsheet";
+    const sheetUrl = sheetOption.url || sheetName;
+    
+    setActiveSheetName(sheetUrl) // Simpan URL-nya, bukan namanya
     
     // UI Feedback
-    const userMsg = { role: 'user', text: `📄 Pakai spreadsheet: ${cleanSheetName}`, files: [], previews: [] }
+    const userMsg = { role: 'user', text: `📄 Pakai spreadsheet: ${sheetName}`, files: [], previews: [] }
     setMessages(prev => [...prev, userMsg])
     setIsTyping(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/api/get-sheet?sheet_name=${encodeURIComponent(cleanSheetName)}`);
+      // Kirim URL ke backend, jangan lupa di encode
+      const response = await fetch(`http://localhost:8000/api/get-sheet?sheet_name=${encodeURIComponent(sheetUrl)}`);
       if (!response.ok) throw new Error("Gagal mengambil data dari Google Sheets");
       
       const result = await response.json();
@@ -742,7 +746,17 @@ SANGAT PENTING:
             onSelectExistingSheet={handleSelectExistingSheet}
             onUpdateWorkingData={(newData) => {
               setWorkingData(newData);
-              saveCurrentStateToBackend(messages, newData);
+              
+              // Update juga data spreadsheet di chat bubble terakhir agar sinkron
+              setMessages(prev => {
+                const updatedMsgs = [...prev];
+                const lastAiIndex = updatedMsgs.findLastIndex(msg => msg.role === 'model' || msg.role === 'ai');
+                if (lastAiIndex !== -1 && updatedMsgs[lastAiIndex].spreadsheet) {
+                  updatedMsgs[lastAiIndex].spreadsheet = newData;
+                }
+                saveCurrentStateToBackend(updatedMsgs, newData);
+                return updatedMsgs;
+              });
             }}
           />
         )}
