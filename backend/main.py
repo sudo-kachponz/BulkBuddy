@@ -17,7 +17,7 @@ from mcp_tools.routes.chat_history import router as chat_history_router
 
 # Load environment variables from the project root .env
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)  # override=True agar .env selalu menang vs cache pm2
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
