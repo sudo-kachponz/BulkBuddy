@@ -22,9 +22,9 @@ function Toast({ toast, onClose }) {
     warning: 'from-amber-500 to-orange-500',
   }
   return (
-    <div className={`fixed top-16 md:top-20 right-4 md:right-5 z-[60] flex items-center justify-between gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter max-w-[calc(100vw-32px)] md:max-w-md break-words whitespace-normal leading-snug`}>
-      <span className="flex-1">{toast.msg}</span>
-      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80 shrink-0">✕</button>
+    <div className={`fixed top-[calc(env(safe-area-inset-top,0px)+56px)] md:top-20 left-4 right-4 md:left-auto md:right-5 md:max-w-md z-[150] flex items-center justify-between gap-2 px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter break-words leading-snug`}>
+      <span className="flex-1 min-w-0 break-words">{toast.msg}</span>
+      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80 shrink-0 leading-none">✕</button>
     </div>
   )
 }
@@ -50,7 +50,7 @@ export default function App() {
   const [activeSheetName, setActiveSheetName] = useState(null)
 
   // Chat History via custom hook
-  const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
+  const { sessions, loadSessions, getSession, createSession, updateSession, deleteSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
 
   // Refs to prevent duplicate creations and track sync state
@@ -69,11 +69,13 @@ export default function App() {
   }, [loadSessions])
 
   // Helper to persist current UI state to backend
-  const saveCurrentStateToBackend = async (newMessages, newWorkingData) => {
+  const saveCurrentStateToBackend = async (newMessages, newWorkingData, overrideSheetUrl) => {
+    const sheetUrlToSave = overrideSheetUrl !== undefined ? overrideSheetUrl : activeSheetName;
     if (activeSessionRef.current) {
       await updateSession(activeSessionRef.current.id, {
         messages: newMessages,
-        workingData: newWorkingData
+        workingData: newWorkingData,
+        sheet_url: sheetUrlToSave,
       })
     } else {
       if (creatingSessionRef.current) return;
@@ -82,7 +84,8 @@ export default function App() {
         const sess = await createSession({
           messages: newMessages,
           workingData: newWorkingData,
-          thread_id: chatThreadIdRef.current
+          thread_id: chatThreadIdRef.current,
+          sheet_url: sheetUrlToSave,
         })
         if (sess) {
           setActiveSession(sess)
@@ -547,7 +550,8 @@ SANGAT PENTING:
       
       setMessages(prev => {
         const updated = [...prev, aiMsg]
-        setTimeout(() => saveCurrentStateToBackend(updated, sheetData), 0)
+        // Simpan URL spreadsheet ke session backend
+        setTimeout(() => saveCurrentStateToBackend(updated, sheetData, sheetUrl), 0)
         return updated
       })
       
@@ -561,7 +565,7 @@ SANGAT PENTING:
       };
       setMessages(prev => {
         const updated = [...prev, aiMsg]
-        setTimeout(() => saveCurrentStateToBackend(updated, []), 0)
+        setTimeout(() => saveCurrentStateToBackend(updated, [], sheetUrl), 0)
         return updated
       })
       showToast(e.message, 'error')
@@ -608,6 +612,24 @@ SANGAT PENTING:
     }, 100);
   }
 
+  /* ── Delete chat from history ── */
+  const handleDeleteChat = async (sessionId) => {
+    const success = await deleteSession(sessionId)
+    if (success) {
+      // Kalau yang dihapus adalah sesi yang sedang aktif, reset ke blank
+      if (activeSessionRef.current && activeSessionRef.current.id === sessionId) {
+        setMessages([])
+        setWorkingData([])
+        setActiveSession(null)
+        setActiveSheetName(null)
+        chatThreadIdRef.current = crypto.randomUUID()
+      }
+      showToast('🗑️ Sesi berhasil dihapus', 'info')
+    } else {
+      showToast('Gagal menghapus sesi', 'warning')
+    }
+  }
+
   /* ── Load chat from history ── */
   const handleSelectChat = async (chatItem) => {
     // We already have some metadata in sidebar, but we need full session for messages
@@ -617,7 +639,8 @@ SANGAT PENTING:
       chatThreadIdRef.current = fullSession.thread_id
       setMessages(fullSession.messages || [])
       setWorkingData(fullSession.working_data || [])
-      setActiveSheetName(fullSession.title || chatItem.title)
+      // Restore spreadsheet URL jika tersimpan, fallback ke title
+      setActiveSheetName(fullSession.sheet_url || fullSession.title || chatItem.title)
     }
   }
 
@@ -711,7 +734,7 @@ SANGAT PENTING:
   const isEmpty = messages.length === 0
 
   return (
-    <div className="h-screen flex font-poppins bg-[#f0f4f8]">
+    <div className="flex font-poppins bg-[#f0f4f8]" style={{ height: '100dvh' }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
 
 
@@ -723,12 +746,13 @@ SANGAT PENTING:
         onNewChat={handleNewChat}
         historyData={sessions}
         onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
       />
 
       {/* Main Chat Panel */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
         {/* Top bar */}
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0">
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0" style={{ paddingTop: 'max(12px, calc(env(safe-area-inset-top, 0px) + 12px))' }}>
           
           {/* Mandiri Logo — absolute inside Top bar so it moves with the panel */}
           <div className={`absolute top-2.5 right-4 md:right-5 z-50 pointer-events-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>

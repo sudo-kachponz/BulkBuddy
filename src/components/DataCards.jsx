@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { useState, useRef, useEffect } from 'react'
 import { CheckCircle2, AlertTriangle, Download, Send, FileText, Pencil, X, Check } from 'lucide-react'
 import { NASABAH_COLUMNS, PRIMARY_COLUMNS, toMCPPayload } from '../data/schema'

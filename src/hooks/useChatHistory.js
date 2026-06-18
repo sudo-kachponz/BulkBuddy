@@ -47,12 +47,12 @@ export function useChatHistory() {
   }, []);
 
   // Create a new session
-  const createSession = useCallback(async ({ messages = [], workingData = [], title = '', preview = '' }) => {
+  const createSession = useCallback(async ({ messages = [], workingData = [], title = '', preview = '', thread_id, sheet_url = '' }) => {
     try {
       const res = await fetch(`${API_BASE}/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, working_data: workingData, title, preview }),
+        body: JSON.stringify({ messages, working_data: workingData, title, preview, thread_id, sheet_url }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const newSession = await res.json();
@@ -70,13 +70,14 @@ export function useChatHistory() {
   }, []);
 
   // Update an existing session
-  const updateSession = useCallback(async (sessionId, { messages, workingData, title, preview }) => {
+  const updateSession = useCallback(async (sessionId, { messages, workingData, title, preview, sheet_url }) => {
     try {
       const payload = {};
       if (messages !== undefined) payload.messages = messages;
       if (workingData !== undefined) payload.working_data = workingData;
       if (title !== undefined) payload.title = title;
       if (preview !== undefined) payload.preview = preview;
+      if (sheet_url !== undefined) payload.sheet_url = sheet_url;
 
       const res = await fetch(`${API_BASE}/${sessionId}`, {
         method: 'PUT',

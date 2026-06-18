@@ -43,6 +43,7 @@ class CreateSessionRequest(BaseModel):
     messages: List[Dict[str, Any]] = []
     working_data: List[Dict[str, Any]] = []
     thread_id: Optional[str] = None  # if None, a new UUID is generated
+    sheet_url: Optional[str] = None  # active spreadsheet URL
 
 
 class UpdateSessionRequest(BaseModel):
@@ -50,6 +51,7 @@ class UpdateSessionRequest(BaseModel):
     preview: Optional[str] = None
     messages: Optional[List[Dict[str, Any]]] = None
     working_data: Optional[List[Dict[str, Any]]] = None
+    sheet_url: Optional[str] = None  # active spreadsheet URL
 
 
 # ── GET /chat-history/ ────────────────────────────────────────
@@ -107,6 +109,7 @@ async def create_session(
         "preview": body.preview or "",
         "messages": body.messages,
         "working_data": body.working_data,
+        "sheet_url": body.sheet_url or "",
     }
     try:
         resp = supabase.table(TABLE).insert(payload).execute()
@@ -170,6 +173,8 @@ async def update_session(
         # Auto-updating title from message is removed to preserve date-based titles
     if body.working_data is not None:
         payload["working_data"] = body.working_data
+    if body.sheet_url is not None:
+        payload["sheet_url"] = body.sheet_url
 
     # Build preview from last AI message
     if body.messages is not None and body.preview is None:

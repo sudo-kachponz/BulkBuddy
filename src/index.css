@@ -31,6 +31,8 @@
 
 html, body, #root {
   height: 100%;
+  /* dvh adjusts for mobile browser chrome (address bar, tab strip) */
+  height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;

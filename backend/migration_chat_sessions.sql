@@ -33,3 +33,9 @@ DROP TRIGGER IF EXISTS trg_chat_sessions_updated_at ON public.chat_sessions;
 CREATE TRIGGER trg_chat_sessions_updated_at
     BEFORE UPDATE ON public.chat_sessions
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ============================================================
+-- Migration: Add sheet_url column (run if upgrading existing DB)
+-- ============================================================
+ALTER TABLE public.chat_sessions
+    ADD COLUMN IF NOT EXISTS sheet_url TEXT NOT NULL DEFAULT '';
