@@ -84,7 +84,7 @@ async def update_sheet_api(request: UpdateSheetRequest):
         worksheet.batch_clear(["A2:AI"]) 
         
         if sheet_values:
-            worksheet.update('A2', sheet_values)
+            worksheet.update(values=sheet_values, range_name='A2')
 
         return {"status": "success", "message": f"Data saved to {request.sheet_name} instantly!"}
 
