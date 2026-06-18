@@ -39,7 +39,7 @@ export function ExtractedDataCard({ data }) {
         {displayFields.map(([label, val]) => (
           <div key={label} className="contents">
             <span className="text-[#344054]/70 font-medium text-xs">{label}</span>
-            <span className={`font-semibold ${isLow && String(val).length > 16 ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-[#344054]'}`}>
+            <span className={`font-semibold break-all ${isLow && String(val).length > 16 ? 'text-amber-600 bg-amber-100 px-1.5 rounded' : 'text-[#344054]'}`}>
               {val || '—'}
             </span>
           </div>
@@ -154,7 +154,7 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet, 
       <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-primary-50 to-blue-50 border-b border-[#344054]/10">
         <img src={sheetsIcon} alt="Sheets" className="w-6 h-6 object-contain" />
         <span className="text-sm font-bold text-primary-800">Spreadsheet Batch — {rows.length} Nasabah</span>
-        <span className="text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
+        <span className="hidden md:inline text-[11px] text-slate-400 ml-2">({NASABAH_COLUMNS.length} kolom)</span>
         <span className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all duration-300
           ${saveStatus === 'saving' ? 'text-amber-600 bg-amber-50 border border-amber-200 animate-pulse' :
             saveStatus === 'saved' ? 'text-emerald-600 bg-emerald-50 border border-emerald-200' :
