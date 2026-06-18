@@ -25,7 +25,7 @@ export const NASABAH_COLUMNS = [
   { key: 'warga_negara',  csvHeader: 'WARGA NEGARA',              label: 'WN',              type: 'string', source: 'default', required: true,  width: 'min-w-[50px]',  defaultValue: '000' },
   { key: 'no_ktp',        csvHeader: 'NO KTP / PASSPORT',         label: 'No KTP',          type: 'string', source: 'ocr',     required: true,  width: 'min-w-[160px]' },
   { key: 'kota_ktp',      csvHeader: 'KOTA_KTP',                  label: 'Kota KTP',        type: 'string', source: 'ocr',     required: true,  width: 'min-w-[120px]' },
-  { key: 'exp_ktp',       csvHeader: 'EXP_KTP/PASSPORT',          label: 'Exp KTP',         type: 'number', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: 0 },
+  { key: 'exp_ktp',       csvHeader: 'EXP_KTP/PASSPORT',          label: 'Exp KTP',         type: 'string', source: 'default', required: false, width: 'min-w-[70px]',  defaultValue: '000000' },
   { key: 'jenis_id_tambahan', csvHeader: 'JENIS IDENTITAS TAMBAHAN', label: 'Jenis ID Lain', type: 'string', source: 'user',  required: false, width: 'min-w-[100px]' },
   { key: 'no_id_tambahan',    csvHeader: 'NO IDENTITAS TAMBAHAN',    label: 'No ID Lain',   type: 'string', source: 'user',    required: false, width: 'min-w-[120px]' },
   { key: 'ibu_kandung',   csvHeader: 'IBUKANDUNG',                label: 'Ibu Kandung',     type: 'string', source: 'ocr',     required: true,  width: 'min-w-[140px]' },
@@ -42,8 +42,8 @@ export const NASABAH_COLUMNS = [
   { key: 'email',         csvHeader: 'EMAIL',                     label: 'Email',           type: 'string', source: 'user',    required: false, width: 'min-w-[150px]' },
 
   // ── Pekerjaan ──
-  { key: 'pekerjaan',     csvHeader: 'KERJAPSW',                  label: 'Pekerjaan',       type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: '' },
-  { key: 'jabatan',       csvHeader: 'JABATAN',                   label: 'Jabatan',         type: 'string', source: 'user',    required: false, width: 'min-w-[80px]' },
+  { key: 'pekerjaan',     csvHeader: 'KERJAPSW',                  label: 'Pekerjaan',       type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: 'PSW' },
+  { key: 'jabatan',       csvHeader: 'JABATAN',                   label: 'Jabatan',         type: 'string', source: 'ocr',     required: false, width: 'min-w-[80px]' },
   { key: 'employer_name', csvHeader: 'EMPLOYER NAME',             label: 'Perusahaan',      type: 'string', source: 'default', required: false, width: 'min-w-[120px]', defaultValue: 'PT SUTET' },
   { key: 'kode_industri', csvHeader: 'KODE_INDUSTRI',             label: 'Kd Industri',     type: 'string', source: 'default', required: false, width: 'min-w-[80px]',  defaultValue: '09' },
   { key: 'tgl_mulai',     csvHeader: 'TGL_MULA',                  label: 'Tgl Mulai',       type: 'string', source: 'default', required: false, width: 'min-w-[90px]',  defaultValue: '010226' },

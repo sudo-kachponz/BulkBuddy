@@ -166,7 +166,7 @@ async def generate_reports(req: ReportRequest):
     target_columns = ["No Telp Rumah", "No. Handphone", "NO KTP / PASSPORT", "NO IDENTITAS TAMBAHAN", "KODEPOS", "CIF_NO"]
     for row in data:
         # Add template default values
-        row["KERJAPSW"] = row.get("KERJAPSW", "")
+        row["KERJAPSW"] = row.get("KERJAPSW", "PSW")
         row["WARGA NEGARA"] = row.get("WARGA NEGARA", "000")
         row["EMPLOYER NAME"] = row.get("EMPLOYER NAME", "PT SUTET")
         row["KODE_INDUSTRI"] = row.get("KODE_INDUSTRI", "09")
@@ -182,6 +182,8 @@ async def generate_reports(req: ReportRequest):
         row["KODE CABANG"] = row.get("KODE CABANG", "12000")
         row["BANSOS TYPE"] = row.get("BANSOS TYPE", "")
         row["CONSENT"] = row.get("CONSENT", "YYYY")
+
+        row["EXP_KTP/PASSPORT"] = row.get("EXP_KTP/PASSPORT", "000000")
 
         for col in target_columns:
             if col in row and row[col]:

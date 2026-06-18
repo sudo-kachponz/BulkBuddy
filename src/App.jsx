@@ -380,15 +380,22 @@ export default function App() {
 
     if (hasFiles) {
       if (!promptToSend || promptToSend.trim() === '') {
-        promptToSend = `Tolong ekstrasi NIK, Nama, Tempat Tanggal Lahir, Ibu Kandung, dan EC dari foto ini.
+        promptToSend = `Tolong ekstrasi data nasabah dari HINGGA 3 FOTO sekaligus (Formulir, KTP, dan KK) secara menyilang.
 SANGAT PENTING:
-1. Baca nama dengan ekstra teliti! Hati-hati dengan huruf N dan M, baca pelan-pelan (contoh: Firania, BUKAN Firama).
-2. NAMA NASABAH WAJIB DITULIS DALAM HURUF KAPITAL (CAPSLOCK) SEMUA.
-3. Ekstrak KOTA LAHIR dari bagian Tempat/Tgl Lahir dan masukkan ke dalam "kota_lhr".
-4. Kembalikan HANYA format JSON Array yang valid, sesuai dengan urutan baris data. 
+1. Baca nama dengan ekstra teliti! Hati-hati dengan huruf N dan M, baca pelan-pelan. NAMA NASABAH WAJIB KAPITAL (CAPSLOCK) SEMUA.
+2. Ekstrak KOTA LAHIR dari bagian Tempat/Tgl Lahir dan masukkan ke "kota_lhr".
+3. Ekstrak KOTA KTP dari alamat di KTP dan masukkan ke "kota_ktp".
+4. Set kolom EXP KTP/PASSPORT ("exp_ktp") SELALU menjadi teks "000000".
+5. Cari Nama IBU KANDUNG dengan memprioritaskan kecocokan pada dokumen Kartu Keluarga (KK).
+6. Ekstrak STATUS KAWIN. Jika Menikah/Kawin, isi "M", jika Belum Kawin/Belum Menikah, isi "B". Masukkan ke "sts_kawin".
+7. Pecah alamat menjadi 2: "alamat1" untuk nama jalan, dan "alamat2" untuk detail seperti RT/RW (contoh: RT 009 RW 005 JAKARTA). Jika tidak ada RT/RW, boleh dikosongkan.
+8. Ekstrak KODEPOS dan masukkan ke "kodepos".
+9. Format pekerjaan ("pekerjaan") harus diisi dengan "PSW".
+10. Tentukan KODE JABATAN ("jabatan"). Jika berkaitan dengan Ahli Madya, gunakan "03". Jika berkaitan dengan Ahli, gunakan "25". Jika tidak spesifik, gunakan "09" atau kode lain yang relevan.
+11. Kembalikan HANYA format JSON Array yang valid, sesuai urutan baris data.
 Format kunci (keys) harus sama persis dengan struktur ini:
 [
-  { "id": "${workingData.length + 1}", "nama": "NAMA_NASABAH", "kelamin": "F/M", "kota_lhr": "KOTA_LAHIR", "tgl_lhr": "DDMMYYYY", "no_ktp": "16_DIGIT", "ibu_kandung": "NAMA_IBU", "handphone": "08XX", "alamat1": "ALAMAT", "kodepos": "12345", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
+  { "id": "${workingData.length + 1}", "nama": "NAMA_NASABAH", "kelamin": "F/M", "kota_lhr": "KOTA_LAHIR", "tgl_lhr": "DDMMYYYY", "no_ktp": "16_DIGIT", "kota_ktp": "KOTA", "exp_ktp": "000000", "ibu_kandung": "NAMA_IBU", "sts_kawin": "M/B", "alamat1": "NAMA_JALAN", "alamat2": "RT_RW", "kodepos": "12345", "handphone": "08XX", "pekerjaan": "PSW", "jabatan": "09", "currency": "IDR", "produk": "TABMANDIRI", "kode_cabang": 12000, "consent": "YYYY" }
 ]
 Dilarang memberikan kata-kata pengantar atau penutup. Berikan array JSON saja di dalam \`\`\`json blok.`
       }
