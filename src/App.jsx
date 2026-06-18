@@ -526,7 +526,7 @@ SANGAT PENTING:
       
       const aiMsg = { 
         role: 'model', 
-        text: `✅ **Berhasil terhubung ke Spreadsheet!**\n\nSpreadsheet **${cleanSheetName}** telah aktif dan isinya berhasil dimuat. Anda bisa melanjutkan upload form fisik nasabah, dan data akan otomatis ditambahkan ke file ini.`
+        text: `✅ **Berhasil terhubung ke Spreadsheet!**\n\nSpreadsheet **${sheetName}** telah aktif dan isinya berhasil dimuat. Anda bisa melanjutkan upload form fisik nasabah, dan data akan otomatis ditambahkan ke file ini.`
       };
       
       setMessages(prev => {
@@ -535,7 +535,7 @@ SANGAT PENTING:
         return updated
       })
       
-      showToast(`Berhasil memuat ${sheetData.length} baris data dari ${cleanSheetName}`, 'success')
+      showToast(`Berhasil memuat ${sheetData.length} baris data dari ${sheetName}`, 'success')
       
     } catch (e) {
       console.error(e)
