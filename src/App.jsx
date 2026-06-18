@@ -388,7 +388,7 @@ SANGAT PENTING:
 4. Set kolom EXP KTP/PASSPORT ("exp_ktp") SELALU menjadi teks "000000".
 5. Cari Nama IBU KANDUNG dengan memprioritaskan kecocokan pada dokumen Kartu Keluarga (KK).
 6. Ekstrak STATUS KAWIN. Jika Menikah/Kawin, isi "M", jika Belum Kawin/Belum Menikah, isi "B". Masukkan ke "sts_kawin".
-7. Pecah alamat menjadi 2: "alamat1" untuk nama jalan, dan "alamat2" untuk detail seperti RT/RW (contoh: RT 009 RW 005 JAKARTA). Jika tidak ada RT/RW, boleh dikosongkan.
+7. Pecah alamat menjadi 2: "alamat1" untuk nama jalan, dan "alamat2" HANYA berisi RT, RW, dan nama KOTA UTAMA (buang detail Kelurahan/Kecamatan/Jakarta Utara/Barat, cukup tulis "JAKARTA" atau kotanya saja). Contoh Wajib: "RT 009 RW 005 JAKARTA" atau "RT 011 RW 004 SURABAYA". Jika tidak ada RT/RW, boleh dikosongkan.
 8. Ekstrak KODEPOS dan masukkan ke "kodepos".
 9. Format pekerjaan ("pekerjaan") harus diisi dengan "PSW".
 10. Tentukan KODE JABATAN ("jabatan"). Jika berkaitan dengan Ahli Madya, gunakan "03". Jika berkaitan dengan Ahli, gunakan "25". Jika tidak spesifik, gunakan "09" atau kode lain yang relevan.
