@@ -54,7 +54,7 @@ function UserBubble({ message }) {
           </div>
         )}
         {message.text && (
-          <div className="bg-gradient-to-br from-primary-600 to-primary-500 text-white rounded-2xl rounded-tr-md px-4 py-2.5 text-sm shadow-md shadow-primary-500/15 ml-auto w-fit">
+          <div className="bg-gradient-to-br from-primary-500 to-primary-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-md text-sm shadow-sm leading-relaxed whitespace-pre-line break-words max-w-full">
             {message.text}
           </div>
         )}
@@ -77,7 +77,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
         {/* Text content */}
         {message.text && (
           <div 
-            className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line"
+            className="bg-white rounded-2xl rounded-tl-md px-4 py-2.5 text-sm text-slate-700 shadow-sm border border-slate-100 leading-relaxed whitespace-pre-line break-words overflow-x-auto max-w-full"
             dangerouslySetInnerHTML={renderMarkdownHTML(message.text)}
           />
         )}

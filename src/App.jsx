@@ -22,9 +22,9 @@ function Toast({ toast, onClose }) {
     warning: 'from-amber-500 to-orange-500',
   }
   return (
-    <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter`}>
-      {toast.msg}
-      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80">✕</button>
+    <div className={`fixed top-16 md:top-20 right-4 md:right-5 z-[60] flex items-center justify-between gap-3 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter max-w-[calc(100vw-32px)] md:max-w-md break-words whitespace-normal leading-snug`}>
+      <span className="flex-1">{toast.msg}</span>
+      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80 shrink-0">✕</button>
     </div>
   )
 }
