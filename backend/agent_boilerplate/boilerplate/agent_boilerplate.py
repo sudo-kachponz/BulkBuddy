@@ -178,6 +178,7 @@ class AgentBoilerplate:
                     
                     if latest_version.get("released"):
                         tool_name = tool.get("name", "unknown_tool")
+                        released_config = latest_version.get("released", {})
                         transport_type = released_config.get("transport", "sse")
                         if transport_type == "stdio":
                             # Use stdio transport directly
