@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import asyncio
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -17,7 +19,7 @@ from mcp_tools.routes.chat_history import router as chat_history_router
 
 # Load environment variables from the project root .env
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-load_dotenv(env_path, override=True)  # override=True agar .env selalu menang vs cache pm2
+load_dotenv(env_path)
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
@@ -50,20 +52,95 @@ class MockAuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(MockAuthMiddleware)
 
+# ── Path ke credentials.json Service Account ──
+# File ini ada di root project (satu level di atas folder backend/)
+SA_CREDENTIALS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+TOKENS_DIR = os.path.expanduser("~/.local/share/google-mcp")
+TOKENS_PATH = os.path.join(TOKENS_DIR, "tokens.json")
+
+SA_SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/presentations",
+    "https://www.googleapis.com/auth/calendar",
+]
+
+def refresh_sa_token():
+    """
+    Baca Service Account credentials.json, generate access token baru,
+    dan tulis ke ~/.local/share/google-mcp/tokens.json.
+    Dipanggil saat startup DAN setiap 45 menit secara otomatis.
+    """
+    if not os.path.exists(SA_CREDENTIALS_PATH):
+        print(f"[SA Auth] WARNING: {SA_CREDENTIALS_PATH} tidak ditemukan. Melewati refresh token.")
+        return False
+
+    try:
+        with open(SA_CREDENTIALS_PATH) as f:
+            sa_info = json.load(f)
+
+        if sa_info.get("type") != "service_account":
+            print("[SA Auth] WARNING: credentials.json bukan Service Account. Melewati refresh token.")
+            return False
+
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request as GoogleRequest
+
+        creds = service_account.Credentials.from_service_account_file(
+            SA_CREDENTIALS_PATH, scopes=SA_SCOPES
+        )
+        creds.refresh(GoogleRequest())
+
+        os.makedirs(TOKENS_DIR, exist_ok=True)
+        tokens_data = {
+            "access_token": creds.token,
+            "token_type": "Bearer",
+            "expiry_date": int(creds.expiry.timestamp() * 1000) if creds.expiry else None,
+        }
+        with open(TOKENS_PATH, "w") as f:
+            json.dump(tokens_data, f, indent=2)
+
+        expiry_str = str(creds.expiry) if creds.expiry else "N/A"
+        print(f"[SA Auth] ✅ Token Service Account berhasil di-refresh! Berlaku sampai: {expiry_str}")
+        return True
+
+    except ImportError:
+        print("[SA Auth] ERROR: google-auth tidak terinstal. Jalankan: pip install google-auth")
+        return False
+    except Exception as e:
+        print(f"[SA Auth] ERROR saat refresh token: {e}")
+        return False
+
+
+async def sa_token_scheduler():
+    """
+    Background task yang berjalan selamanya.
+    Refresh token setiap 45 menit untuk menghindari expiry 1 jam dari Google.
+    """
+    REFRESH_INTERVAL_SECONDS = 45 * 60  # 45 menit
+    while True:
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
+        print("[SA Auth] ⏰ Menjalankan refresh token Service Account terjadwal...")
+        refresh_sa_token()
+
+
 def setup_google_credentials():
-    import json
+    """Buat credentials.json untuk google-mcp dari env vars (opsional, untuk OAuth lama)."""
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     project_id = os.environ.get("GOOGLE_PROJECT_ID")
-    
+
     if not client_id or not client_secret:
-        print("Warning: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not found. Skipping credentials.json generation.")
+        print("Info: GOOGLE_CLIENT_ID/SECRET tidak di-set. Melewati generate credentials.json.")
         return
-        
+
     creds_dir = os.path.expanduser("~/.config/google-mcp")
     os.makedirs(creds_dir, exist_ok=True)
     creds_path = os.path.join(creds_dir, "credentials.json")
-    
+
     creds_data = {
       "installed": {
         "client_id": client_id,
@@ -83,55 +160,28 @@ def setup_google_credentials():
         ]
       }
     }
-    
+
     with open(creds_path, 'w') as f:
         json.dump(creds_data, f, indent=2)
     print(f"Generated Google MCP credentials at {creds_path}")
 
 
-def setup_google_tokens():
-    """Write tokens.json from env variable GOOGLE_REFRESH_TOKEN.
-    Ini solusi untuk VPS headless: daripada harus buka browser setiap token expired,
-    kita simpan refresh_token di .env dan regenerate tokens.json otomatis saat startup.
-    """
-    import json
-    client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
-    
-    if not refresh_token:
-        print("Info: GOOGLE_REFRESH_TOKEN not set in .env. Skipping tokens.json generation.")
-        return
-    
-    if not client_id or not client_secret:
-        print("Warning: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing.")
-        return
-
-    tokens_dir = os.path.expanduser("~/.local/share/google-mcp")
-    os.makedirs(tokens_dir, exist_ok=True)
-    tokens_path = os.path.join(tokens_dir, "tokens.json")
-
-    tokens_data = {
-        "access_token": "",
-        "refresh_token": refresh_token,
-        "scope": "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts https://www.googleapis.com/auth/presentations",
-        "token_type": "Bearer",
-        "expiry_date": 1000  # Force immediate refresh
-    }
-    
-    with open(tokens_path, 'w') as f:
-        json.dump(tokens_data, f, indent=2)
-    print(f"[VPS Auth] Berhasil membuat tokens.json dari GOOGLE_REFRESH_TOKEN!")
-
 @app.on_event("startup")
 async def startup_event():
     # Make supabase available in app.state for the routers
     app.state.supabase = supabase_client
-    # Generate credentials for google-mcp
+
+    # Generate credentials untuk google-mcp (OAuth lama, opsional)
     setup_google_credentials()
-    # Inject tokens.json from GOOGLE_REFRESH_TOKEN env var (solusi headless VPS)
-    setup_google_tokens()
-    
+
+    # [SA Auth] Refresh token Service Account saat startup — GANTI setup_google_tokens()
+    print("[SA Auth] 🔑 Melakukan refresh token Service Account awal...")
+    refresh_sa_token()
+
+    # Jalankan scheduler refresh token di background (setiap 45 menit)
+    asyncio.create_task(sa_token_scheduler())
+    print("[SA Auth] ⏰ Scheduler refresh token (45 menit) aktif.")
+
     # Start the MCP proxy manager to spawn background MCP servers
     print("Starting MCP proxy manager...")
     try:
