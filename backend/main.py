@@ -52,79 +52,48 @@ class MockAuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(MockAuthMiddleware)
 
-# ── Path ke credentials.json Service Account ──
-# File ini ada di root project (satu level di atas folder backend/)
-SA_CREDENTIALS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+# ── Path ke tokens.json OAuth ──
 TOKENS_DIR = os.path.expanduser("~/.local/share/google-mcp")
 TOKENS_PATH = os.path.join(TOKENS_DIR, "tokens.json")
 
-SA_SCOPES = [
-    "https://www.googleapis.com/auth/documents",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/presentations",
-    "https://www.googleapis.com/auth/calendar",
-]
 
-def refresh_sa_token():
+def setup_google_tokens():
     """
-    Baca Service Account credentials.json, generate access token baru,
-    dan tulis ke ~/.local/share/google-mcp/tokens.json.
-    Dipanggil saat startup DAN setiap 45 menit secara otomatis.
+    Tulis tokens.json OAuth untuk google-mcp dari GOOGLE_REFRESH_TOKEN.
+    Menggunakan expiry_date=1 (1 milidetik) agar library google-auth di
+    Node.js mendeteksi token sudah kedaluwarsa dan otomatis melakukan
+    refresh di latar belakang — tanpa mencoba membuka browser (headless VPS).
     """
-    if not os.path.exists(SA_CREDENTIALS_PATH):
-        print(f"[SA Auth] WARNING: {SA_CREDENTIALS_PATH} tidak ditemukan. Melewati refresh token.")
+    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+    if not refresh_token:
+        print("[OAuth] WARNING: GOOGLE_REFRESH_TOKEN tidak ditemukan di environment. Melewati setup tokens.json.")
         return False
 
     try:
-        with open(SA_CREDENTIALS_PATH) as f:
-            sa_info = json.load(f)
-
-        if sa_info.get("type") != "service_account":
-            print("[SA Auth] WARNING: credentials.json bukan Service Account. Melewati refresh token.")
-            return False
-
-        from google.oauth2 import service_account
-        from google.auth.transport.requests import Request as GoogleRequest
-
-        creds = service_account.Credentials.from_service_account_file(
-            SA_CREDENTIALS_PATH, scopes=SA_SCOPES
-        )
-        creds.refresh(GoogleRequest())
-
         os.makedirs(TOKENS_DIR, exist_ok=True)
         tokens_data = {
-            "access_token": creds.token,
+            "access_token": "",
+            "refresh_token": refresh_token,
+            "scope": (
+                "https://www.googleapis.com/auth/documents "
+                "https://www.googleapis.com/auth/spreadsheets "
+                "https://www.googleapis.com/auth/drive "
+                "https://www.googleapis.com/auth/gmail.modify "
+                "https://www.googleapis.com/auth/gmail.send "
+                "https://www.googleapis.com/auth/presentations "
+                "https://www.googleapis.com/auth/calendar"
+            ),
             "token_type": "Bearer",
-            "expiry_date": int(creds.expiry.timestamp() * 1000) if creds.expiry else None,
+            "expiry_date": 1,
         }
         with open(TOKENS_PATH, "w") as f:
             json.dump(tokens_data, f, indent=2)
-
-        expiry_str = str(creds.expiry) if creds.expiry else "N/A"
-        print(f"[SA Auth] ✅ Token Service Account berhasil di-refresh! Berlaku sampai: {expiry_str}")
+        print(f"[OAuth] ✅ tokens.json berhasil ditulis ke {TOKENS_PATH}")
         return True
-
-    except ImportError:
-        print("[SA Auth] ERROR: google-auth tidak terinstal. Jalankan: pip install google-auth")
-        return False
     except Exception as e:
-        print(f"[SA Auth] ERROR saat refresh token: {e}")
+        print(f"[OAuth] ERROR saat menulis tokens.json: {e}")
         return False
 
-
-async def sa_token_scheduler():
-    """
-    Background task yang berjalan selamanya.
-    Refresh token setiap 45 menit untuk menghindari expiry 1 jam dari Google.
-    """
-    REFRESH_INTERVAL_SECONDS = 45 * 60  # 45 menit
-    while True:
-        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
-        print("[SA Auth] ⏰ Menjalankan refresh token Service Account terjadwal...")
-        refresh_sa_token()
 
 
 def setup_google_credentials():
@@ -171,16 +140,12 @@ async def startup_event():
     # Make supabase available in app.state for the routers
     app.state.supabase = supabase_client
 
-    # Generate credentials untuk google-mcp (OAuth lama, opsional)
+    # Generate credentials.json untuk google-mcp (OAuth client ID & secret)
     setup_google_credentials()
 
-    # [SA Auth] Refresh token Service Account saat startup — GANTI setup_google_tokens()
-    print("[SA Auth] 🔑 Melakukan refresh token Service Account awal...")
-    refresh_sa_token()
-
-    # Jalankan scheduler refresh token di background (setiap 45 menit)
-    asyncio.create_task(sa_token_scheduler())
-    print("[SA Auth] ⏰ Scheduler refresh token (45 menit) aktif.")
+    # Tulis tokens.json OAuth dari GOOGLE_REFRESH_TOKEN (headless VPS)
+    print("[OAuth] 🔑 Menyiapkan tokens OAuth untuk google-mcp...")
+    setup_google_tokens()
 
     # Start the MCP proxy manager to spawn background MCP servers
     print("Starting MCP proxy manager...")
