@@ -375,8 +375,8 @@ export default function App() {
   }
 
   /* ── Handle user sending message ── */
-  const handleSend = useCallback(async ({ text, files, previews }) => {
-    const userMsg = { role: 'user', text, files, previews }
+  const handleSend = useCallback(async ({ text, displayText, files, previews }) => {
+    const userMsg = { role: 'user', text: displayText || text, files, previews }
     setMessages(prev => [...prev, userMsg])
 
     const hasFiles = files && files.length > 0
@@ -488,7 +488,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     handleSend({ text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`, files: [], previews: [] })
   }, [handleSend])
 
-  /* ── New chat ── */
+  /* ── New chat (Auto-creates Sheet) ── */
   const handleNewChat = () => {
     setMessages([])
     setWorkingData([])
@@ -498,6 +498,36 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     chatThreadIdRef.current = crypto.randomUUID()
     activeSessionRef.current = null
     creatingSessionRef.current = false
+
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const time = new Date().toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '');
+    const sheetName = `SUTET-${dd}/${mm}/${yyyy}-${time}`;
+    setActiveSheetName(sheetName);
+    const dateStr = `${dd}/${mm}/${yyyy}`;
+    const prompt = `Gunakan tool Google MCP untuk mencari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
+WAJIB: Letakkan file hasil duplikat tersebut DI DALAM FOLDER YANG SAMA dengan lokasi template aslinya.
+Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
+
+Setelah berhasil, SANGAT PENTING: 
+1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
+2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
+[
+  {
+    "type": "sheet_option",
+    "title": "${sheetName}",
+    "url": "<URL_ASLI_DARI_FILE_DUPLIKAT>",
+    "date": "${dateStr}"
+  }
+]
+Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya dari file yang baru saja kamu duplikat.`;
+    
+    // Auto trigger
+    setTimeout(() => {
+      handleSend({ text: prompt, displayText: `✨ Membuat Spreadsheet Baru — ${sheetName}`, files: [], previews: [] });
+    }, 100);
   }
 
   /* ── Load chat from history ── */
