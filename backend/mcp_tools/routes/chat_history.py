@@ -86,18 +86,17 @@ async def create_session(
     user_id = get_user_id(request)
     thread_id = body.thread_id or str(uuid.uuid4())
 
-    # Auto-generate title based on date if not provided
+    # Auto-generate title as 'Untitled Document' if not provided
     title = body.title
     if not title:
-        today_str = datetime.now().strftime("%d/%m/%Y")
-        base_title = f"SUTET PLN - {today_str}"
+        base_title = "Untitled Document"
         try:
             resp = supabase.table(TABLE).select("title").eq("user_id", user_id).like("title", f"{base_title}%").execute()
             count = len(resp.data) if resp.data else 0
             if count == 0:
                 title = base_title
             else:
-                title = f"{base_title} ({count + 1})"
+                title = f"{base_title} ({count})"
         except Exception:
             title = base_title
 
