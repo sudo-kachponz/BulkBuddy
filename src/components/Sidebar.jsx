@@ -1,17 +1,39 @@
-import { MessageSquarePlus, Clock, ChevronLeft, ChevronRight, Edit2, X, Check } from 'lucide-react'
+import { MessageSquarePlus, Clock, ChevronLeft, ChevronRight, Edit2, X, Check, MoreVertical, Trash2 } from 'lucide-react'
 import logoIcon from '../assets/logo.svg'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat, onUpdateTitle }) {
+export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat, onUpdateTitle, onDeleteChat }) {
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [activeMenuChatId, setActiveMenuChatId] = useState(null)
   const [editingChat, setEditingChat] = useState(null)
   const [newTitle, setNewTitle] = useState('')
 
-  const handleEditClick = (e, chat) => {
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuChatId(null)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
+  const handleMenuClick = (e, chatId) => {
     e.stopPropagation()
+    setActiveMenuChatId(activeMenuChatId === chatId ? null : chatId)
+  }
+
+  const handleRenameClick = (e, chat) => {
+    e.stopPropagation()
+    setActiveMenuChatId(null)
     setEditingChat(chat)
     setNewTitle(chat.title || '')
     setEditModalOpen(true)
+  }
+
+  const handleDeleteClick = (e, chat) => {
+    e.stopPropagation()
+    setActiveMenuChatId(null)
+    setEditingChat(chat)
+    setDeleteModalOpen(true)
   }
 
   const handleSaveTitle = () => {
@@ -19,6 +41,13 @@ export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = 
       onUpdateTitle && onUpdateTitle(editingChat.id, newTitle.trim())
     }
     setEditModalOpen(false)
+  }
+
+  const handleConfirmDelete = () => {
+    if (editingChat) {
+      onDeleteChat && onDeleteChat(editingChat.id)
+    }
+    setDeleteModalOpen(false)
   }
   return (
     <aside className={`relative flex flex-col bg-white/90 backdrop-blur-md border-r border-slate-200/70 transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-72'}`}>
@@ -51,19 +80,37 @@ export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = 
               <div key={chat.id} className="relative group/item">
                 <button onClick={() => onSelectChat && onSelectChat(chat)}
                   className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-primary-50 transition-colors duration-150 group cursor-pointer pr-8">
-                  <p className="text-sm font-medium text-slate-700 truncate group-hover:text-primary-700">{chat.title}</p>
+                  <p className="text-sm font-medium text-slate-700 truncate group-hover:text-primary-700">{chat.title || 'Chat Baru'}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={10} className="text-slate-300" />
-                    <p className="text-[11px] text-slate-400 truncate">{chat.time} — {chat.preview}</p>
+                    <p className="text-[11px] text-slate-400 truncate">{chat.time} — {chat.preview || 'Sesi baru dimulai'}</p>
                   </div>
                 </button>
                 <button 
-                  onClick={(e) => handleEditClick(e, chat)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-primary-600 hover:bg-white rounded-lg opacity-0 group-hover/item:opacity-100 transition-all cursor-pointer shadow-sm"
-                  title="Edit Nama Sesi"
+                  onClick={(e) => handleMenuClick(e, chat.id)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-primary-600 hover:bg-white rounded-lg opacity-0 group-hover/item:opacity-100 transition-all cursor-pointer shadow-sm"
+                  title="Opsi"
                 >
-                  <Edit2 size={14} />
+                  <MoreVertical size={16} />
                 </button>
+
+                {/* Dropdown Menu */}
+                {activeMenuChatId === chat.id && (
+                  <div className="absolute right-8 top-1/2 -translate-y-1/2 w-32 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <button 
+                      onClick={(e) => handleRenameClick(e, chat)}
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Edit2 size={12}/> Ubah Nama
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeleteClick(e, chat)}
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Trash2 size={12}/> Hapus
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -88,6 +135,23 @@ export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = 
             <div className="flex justify-end gap-2">
               <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors text-sm cursor-pointer">Batal</button>
               <button onClick={handleSaveTitle} className="px-4 py-2 bg-primary-600 text-white font-medium hover:bg-primary-700 rounded-xl transition-colors text-sm shadow-md cursor-pointer flex items-center gap-1.5"><Check size={16}/> Simpan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal Popup */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Trash2 size={18} className="text-red-500"/> Hapus Percakapan</h3>
+              <button onClick={() => setDeleteModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X size={18}/></button>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">Apakah anda yakin menghapus percakapan ini?</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors text-sm cursor-pointer">Batal</button>
+              <button onClick={handleConfirmDelete} className="px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-xl transition-colors text-sm shadow-md cursor-pointer flex items-center gap-1.5"><Trash2 size={16}/> Hapus</button>
             </div>
           </div>
         </div>

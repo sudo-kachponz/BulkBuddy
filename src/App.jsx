@@ -103,7 +103,7 @@ export default function App() {
   const [activeSheetName, setActiveSheetName] = useState(null)
   
   // Chat History via custom hook
-  const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
+  const { sessions, loadSessions, getSession, createSession, updateSession, deleteSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
   
   // Modals state
@@ -127,10 +127,18 @@ export default function App() {
 
   // Helper to persist current UI state to backend
   const saveCurrentStateToBackend = async (newMessages, newWorkingData) => {
+    const preview = newMessages.length > 0 
+      ? newMessages[newMessages.length - 1].text?.replace(/```[\s\S]*?```/g, '[Data]').substring(0, 40) + '...' 
+      : ''
+    const title = newMessages.length > 0 
+      ? (newMessages[0].text?.substring(0, 25) + '...') 
+      : 'Chat Baru'
+
     if (activeSessionRef.current) {
       await updateSession(activeSessionRef.current.id, {
         messages: newMessages,
-        workingData: newWorkingData
+        workingData: newWorkingData,
+        preview
       })
     } else {
       if (creatingSessionRef.current) return;
@@ -139,7 +147,9 @@ export default function App() {
         const sess = await createSession({
           messages: newMessages,
           workingData: newWorkingData,
-          thread_id: chatThreadIdRef.current
+          thread_id: chatThreadIdRef.current,
+          title,
+          preview
         })
         if (sess) {
           setActiveSession(sess)
@@ -148,6 +158,13 @@ export default function App() {
       } finally {
         creatingSessionRef.current = false;
       }
+    }
+  }
+
+  const handleDeleteChat = async (id) => {
+    await deleteSession(id)
+    if (activeSessionRef.current?.id === id) {
+      handleNewChat()
     }
   }
 
@@ -479,6 +496,8 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     setActiveSheetName(null)
     setIsTyping(false)
     chatThreadIdRef.current = crypto.randomUUID()
+    activeSessionRef.current = null
+    creatingSessionRef.current = false
   }
 
   /* ── Load chat from history ── */
@@ -590,6 +609,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
         historyData={sessions}
         onSelectChat={handleSelectChat}
         onUpdateTitle={handleUpdateTitle}
+        onDeleteChat={handleDeleteChat}
       />
 
       {/* Main Chat Panel */}
