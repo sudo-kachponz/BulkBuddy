@@ -633,6 +633,22 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
     }
   }
 
+  /* ── Rename chat in history ── */
+  const handleRenameChat = async (sessionId, newTitle) => {
+    if (!newTitle || !newTitle.trim()) return
+    const success = await updateSession(sessionId, { title: newTitle.trim() })
+    if (success) {
+      if (activeSessionRef.current && activeSessionRef.current.id === sessionId) {
+        setActiveSheetName(newTitle.trim())
+      }
+      showToast('✏️ Nama sesi berhasil diubah', 'success')
+      await loadSessions()
+    } else {
+      showToast('❌ Gagal mengubah nama sesi', 'warning')
+    }
+  }
+
+
   /* ── Load chat from history ── */
   const handleSelectChat = async (chatItem) => {
     // We already have some metadata in sidebar, but we need full session for messages
@@ -750,6 +766,7 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
         historyData={sessions}
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
+        onRenameChat={handleRenameChat}
       />
 
       {/* Main Chat Panel */}

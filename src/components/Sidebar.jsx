@@ -38,10 +38,54 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
   )
 }
 
+/* ── Rename Dialog ── */
+function RenameDialog({ initialTitle, onConfirm, onCancel }) {
+  const [title, setTitle] = useState(initialTitle || '')
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      {/* Dialog */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10 msg-enter">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+            <Pencil size={18} className="text-blue-500" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-800 text-base">Ganti Nama</h3>
+            <input 
+              autoFocus
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && onConfirm(title)}
+              className="w-full mt-2 px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Nama spreadsheet..."
+            />
+          </div>
+          <button onClick={onCancel} className="ml-auto text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer">
+            Batal
+          </button>
+          <button onClick={() => onConfirm(title)}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors cursor-pointer">
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Dropdown Menu per Card ── */
-function CardMenu({ chat, onSelect, onDelete }) {
+function CardMenu({ chat, onSelect, onDelete, onRename }) {
   const [open, setOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showRename, setShowRename] = useState(false)
   const menuRef = useRef(null)
 
   // Close on outside click
@@ -60,6 +104,12 @@ function CardMenu({ chat, onSelect, onDelete }) {
     setConfirmDelete(true)
   }
 
+  const handleRename = (e) => {
+    e.stopPropagation()
+    setOpen(false)
+    setShowRename(true)
+  }
+
   const handleOpen = (e) => {
     e.stopPropagation()
     setOpen(false)
@@ -74,6 +124,14 @@ function CardMenu({ chat, onSelect, onDelete }) {
           message={`Sesi "${chat.title || 'Spreadsheet'}" akan dihapus permanen dan tidak bisa dikembalikan.`}
           onConfirm={() => { setConfirmDelete(false); onDelete(chat.id) }}
           onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {showRename && (
+        <RenameDialog
+          initialTitle={chat.title}
+          onConfirm={(newTitle) => { setShowRename(false); onRename(newTitle) }}
+          onCancel={() => setShowRename(false)}
         />
       )}
 
@@ -94,6 +152,13 @@ function CardMenu({ chat, onSelect, onDelete }) {
               <FolderOpen size={14} className="text-primary-500" />
               Buka
             </button>
+            <button
+              onClick={handleRename}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <Pencil size={14} className="text-blue-500" />
+              Ganti Nama
+            </button>
             <div className="border-t border-slate-100 mx-2 my-1" />
             <button
               onClick={handleDelete}
@@ -109,7 +174,7 @@ function CardMenu({ chat, onSelect, onDelete }) {
   )
 }
 
-export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat, onDeleteChat }) {
+export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = [], onSelectChat, onDeleteChat, onRenameChat }) {
   return (
     <aside className={`relative flex flex-col bg-white/90 backdrop-blur-md border-r border-slate-200/70 transition-all duration-300 ease-in-out z-[60] ${collapsed ? 'w-16' : 'w-72'}`}>
       {/* Header */}
@@ -152,6 +217,7 @@ export default function Sidebar({ collapsed, onToggle, onNewChat, historyData = 
                     chat={chat}
                     onSelect={(c) => onSelectChat && onSelectChat(c)}
                     onDelete={(id) => onDeleteChat && onDeleteChat(id)}
+                    onRename={(newTitle) => onRenameChat && onRenameChat(chat.id, newTitle)}
                   />
                 </div>
 
