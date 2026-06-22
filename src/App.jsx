@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { Mail, Check, X } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import ChatArea from './components/ChatArea'
 import InputBar from './components/InputBar'
@@ -28,6 +29,66 @@ function Toast({ toast, onClose }) {
   )
 }
 
+/* ── Email Modal Component ── */
+function EmailModal({ isOpen, onClose, onConfirm }) {
+  const [selectedEmail, setSelectedEmail] = useState("neutracksudo@gmail.com")
+  const [customEmail, setCustomEmail] = useState("")
+
+  if (!isOpen) return null
+
+  const handleConfirm = () => {
+    const emailToSend = selectedEmail === 'custom' ? customEmail : selectedEmail
+    if (!emailToSend || !emailToSend.includes('@')) {
+      alert("Masukkan email yang valid")
+      return
+    }
+    onConfirm(emailToSend)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in fade-in zoom-in duration-200">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><Mail size={18} className="text-primary-500"/> Kirim Laporan via Email</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">Pilih alamat email penerima laporan PDF dan Excel ini.</p>
+        
+        <div className="space-y-3 mb-5">
+          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+            <input type="radio" name="emailSelect" checked={selectedEmail === 'neutracksudo@gmail.com'} onChange={() => setSelectedEmail('neutracksudo@gmail.com')} className="w-4 h-4 text-primary-600 focus:ring-primary-500"/>
+            <span className="text-sm font-medium text-slate-700">neutracksudo@gmail.com (CTO)</span>
+          </label>
+          
+          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+            <input type="radio" name="emailSelect" checked={selectedEmail === 'custom'} onChange={() => setSelectedEmail('custom')} className="w-4 h-4 text-primary-600 focus:ring-primary-500"/>
+            <div className="w-full">
+              <span className="text-sm font-medium text-slate-700 block mb-1">Email Lainnya</span>
+              {selectedEmail === 'custom' && (
+                <input 
+                  type="email" 
+                  value={customEmail}
+                  onChange={e => setCustomEmail(e.target.value)}
+                  placeholder="Masukkan alamat email"
+                  className="w-full mt-1 px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
+              )}
+            </div>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors text-sm cursor-pointer">Batal</button>
+          <button onClick={handleConfirm} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-medium hover:from-primary-700 hover:to-primary-600 rounded-xl transition-colors text-sm shadow-md cursor-pointer">
+            <Check size={16}/> Kirim Sekarang
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════
    ═  MAIN APP
    ══════════════════════════════════════════ */
@@ -44,6 +105,10 @@ export default function App() {
   // Chat History via custom hook
   const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
+  
+  // Modals state
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [pendingEmailData, setPendingEmailData] = useState(null)
   
   // Refs to prevent duplicate creations and track sync state
   const activeSessionRef = useRef(null)
@@ -84,6 +149,10 @@ export default function App() {
         creatingSessionRef.current = false;
       }
     }
+  }
+
+  const handleUpdateTitle = async (id, newTitle) => {
+    await updateSession(id, { title: newTitle })
   }
 
   const showToast = (msg, type = 'success') => {
@@ -430,27 +499,34 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   }
 
   /* ── Confirm Send Flow (Live Data -> CTO) ── */
-  const handleConfirmSend = async (rows) => {
-    showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
+  const promptEmailConfirm = (rows) => {
+    setPendingEmailData(rows)
+    setEmailModalOpen(true)
+  }
 
-    const userMsg = { role: 'user', text: 'Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
+  const handleConfirmSend = async (email) => {
+    const rows = pendingEmailData
+    setEmailModalOpen(false)
+    showToast(`⏳ Memproses dokumen & mengirim email ke ${email}...`, 'info')
+
+    const userMsg = { role: 'user', text: `Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke ${email} beserta lampirannya secara langsung.`, files: [], previews: [] }
     setMessages(prev => [...prev, userMsg])
 
     try {
       const response = await fetch('http://localhost:8000/api/generate-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: rows || [], send_email: true, to_email: "neutracksudo@gmail.com" })
+        body: JSON.stringify({ data: rows || [], send_email: true, to_email: email })
       })
       const result = await response.json()
       if (result.error) throw new Error(result.error)
 
-      showToast('📧 Email beserta lampiran berhasil dikirim ke CTO!', 'success')
+      showToast(`📧 Email beserta lampiran berhasil dikirim ke ${email}!`, 'success')
 
       // Tambahkan response AI instan
       const aiMsg = {
         role: 'model',
-        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
+        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke penerima (*${email}*).`
       }
       setMessages(prev => {
         const newMsgs = [...prev, aiMsg]
@@ -499,6 +575,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
   return (
     <div className="h-screen flex font-poppins bg-[#f0f4f8]">
       <Toast toast={toast} onClose={() => setToast(null)} />
+      <EmailModal isOpen={emailModalOpen} onClose={() => setEmailModalOpen(false)} onConfirm={handleConfirmSend} />
 
       {/* Mandiri Logo — pojok kanan atas */}
       <div className="fixed top-3 right-5 z-50">
@@ -512,6 +589,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
         onNewChat={handleNewChat}
         historyData={sessions}
         onSelectChat={handleSelectChat}
+        onUpdateTitle={handleUpdateTitle}
       />
 
       {/* Main Chat Panel */}
@@ -540,9 +618,9 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
             messages={messages} 
             isTyping={isTyping} 
             onExportPdf={handleExportPdf}
-            onSendCto={handleConfirmSend}
+            onSendCto={promptEmailConfirm}
             onSaveToSheet={handleSaveToSheet}
-            onConfirmSend={handleConfirmSend}
+            onConfirmSend={promptEmailConfirm}
             onNewSheet={handleNewSheet}
             onExistingSheet={handleExistingSheet}
             onSelectExistingSheet={handleSelectExistingSheet}
