@@ -652,11 +652,11 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
     showToast('📥 PDF berhasil di-download!', 'success')
   }
 
-  /* ── Confirm Send Flow (Live Data -> CTO) ── */
-  const handleConfirmSend = async (rows) => {
-    showToast('⏳ Memproses dokumen & mengirim email ke CTO...', 'info')
+  /* ── Confirm Send Flow (Live Data -> Email) ── */
+  const handleConfirmSend = async (rows, targetEmail = "neutracksudo@gmail.com") => {
+    showToast(`⏳ Memproses dokumen & mengirim email ke ${targetEmail}...`, 'info')
 
-    const userMsg = { role: 'user', text: 'Tolong buatkan dokumen Excel lalu kirimkan email ke CTO beserta lampirannya secara langsung.', files: [], previews: [] }
+    const userMsg = { role: 'user', text: `Tolong buatkan dokumen Excel lalu kirimkan email ke ${targetEmail} beserta lampirannya secara langsung.`, files: [], previews: [] }
     setMessages(prev => [...prev, userMsg])
 
     try {
@@ -665,17 +665,17 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
       const response = await fetch(`${baseUrl}/api/generate-reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: sheetRows, send_email: true, to_email: "neutracksudo@gmail.com" })
+        body: JSON.stringify({ data: sheetRows, send_email: true, to_email: targetEmail })
       })
       const result = await response.json()
       if (result.error) throw new Error(result.error)
 
-      showToast('📧 Email beserta lampiran berhasil dikirim ke CTO!', 'success')
+      showToast(`📧 Email beserta lampiran berhasil dikirim ke ${targetEmail}!`, 'success')
 
       // Tambahkan response AI instan
       const aiMsg = {
         role: 'model',
-        text: `✅ **Selesai!**\n\nDokumen Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*neutracksudo@gmail.com*).`
+        text: `✅ **Selesai!**\n\nDokumen Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke tujuan (*${targetEmail}*).`
       }
       setMessages(prev => {
         const newMsgs = [...prev, aiMsg]
