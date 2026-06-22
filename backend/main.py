@@ -1,5 +1,9 @@
 import os
 import sys
+import gc
+import tracemalloc
+import resource
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -12,8 +16,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from agent_boilerplate.routes.agent_invoke import router as agent_invoke_router
 from agent_boilerplate.routes.agent_api import router as agent_api_router
 from mcp_tools.routes.mcp_tools import router as mcp_tools_router, refresh_tools
-from mcp_tools.routes.reports import router as reports_router
+from mcp_tools.routes.reports import router as reports_router, cleanup_old_reports
 from mcp_tools.routes.chat_history import router as chat_history_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("bulkbuddy")
 
 # Load environment variables from the project root .env
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
@@ -31,9 +42,12 @@ supabase_client: Client = create_client(supabase_url, supabase_key) if supabase_
 app = FastAPI(title="BulkBuddy Backend", description="Backend using agent_boilerplate to serve MCP agents.")
 
 # Add CORS Middleware to allow React frontend connection
+# Ambil URL frontend dari environment, jika tidak ada gunakan wildcard (*)
+frontend_url = os.environ.get("FRONTEND_URL", "*")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=[frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"] if frontend_url != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,12 +98,23 @@ def setup_google_credentials():
         json.dump(creds_data, f, indent=2)
     print(f"Generated Google MCP credentials at {creds_path}")
 
+
+# ── Startup & Shutdown Lifecycle ──────────────────────────────────────
+
 @app.on_event("startup")
 async def startup_event():
+    # Start tracemalloc for memory debugging (low overhead, ~5% CPU)
+    tracemalloc.start(10)  # Track top 10 frames
+    logger.info("🧠 tracemalloc started for memory monitoring")
+
     # Make supabase available in app.state for the routers
     app.state.supabase = supabase_client
+
     # Generate credentials for google-mcp
     setup_google_credentials()
+    
+    # Clean up any stale temp report files from previous runs
+    cleanup_old_reports(max_age_hours=2)
     
     # Start the MCP proxy manager to spawn background MCP servers
     print("Starting MCP proxy manager...")
@@ -98,15 +123,141 @@ async def startup_event():
     except Exception as e:
         print(f"Failed to start MCP proxy manager: {e}")
 
+    logger.info("✅ BulkBuddy Backend started successfully")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on shutdown to prevent zombie processes."""
+    logger.info("🛑 BulkBuddy Backend shutting down...")
+    
+    # Stop all MCP proxy processes
+    try:
+        from mcp_tools.routes.mcp_tools import manager
+        manager.stop_all()
+        logger.info("✅ All MCP proxy processes stopped")
+    except Exception as e:
+        logger.warning("⚠️  Error stopping MCP processes: %s", e)
+    
+    # Stop tracemalloc
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+        logger.info("🧠 tracemalloc stopped")
+    
+    # Force garbage collection
+    gc.collect()
+    logger.info("🛑 Shutdown complete")
+
+
+# ── Routers ───────────────────────────────────────────────────────────
+
 app.include_router(agent_invoke_router)
 app.include_router(agent_api_router)
 app.include_router(mcp_tools_router)
 app.include_router(reports_router)
 app.include_router(chat_history_router)
 
+
+# ── Health & Debug Endpoints ──────────────────────────────────────────
+
 @app.get("/")
 def read_root():
     return {"message": "BulkBuddy Backend is up and running!"}
+
+
+@app.get("/debug/memory")
+async def debug_memory():
+    """
+    Memory debugging endpoint — hit this from browser to monitor RAM usage.
+    
+    Returns:
+        - RSS: Total physical memory used by this process (in MB)
+        - tracemalloc_top: Top 10 code locations consuming the most memory
+        - agent_memories: Number of agent conversation memories in RAM
+        - gc_stats: Python garbage collector statistics
+    """
+    result = {}
+    
+    # 1. Process RSS memory (via resource module — no psutil needed)
+    try:
+        # getrusage returns maxrss in KB on Linux
+        rusage = resource.getrusage(resource.RUSAGE_SELF)
+        result["rss_mb"] = round(rusage.ru_maxrss / 1024, 2)
+    except Exception as e:
+        result["rss_mb"] = f"Error: {e}"
+    
+    # 2. Try psutil for more accurate current RSS (optional dependency)
+    try:
+        import psutil
+        process = psutil.Process()
+        mem_info = process.memory_info()
+        result["rss_current_mb"] = round(mem_info.rss / (1024 * 1024), 2)
+        result["vms_mb"] = round(mem_info.vms / (1024 * 1024), 2)
+        
+        # System-wide memory
+        sys_mem = psutil.virtual_memory()
+        result["system_memory"] = {
+            "total_mb": round(sys_mem.total / (1024 * 1024), 2),
+            "available_mb": round(sys_mem.available / (1024 * 1024), 2),
+            "percent_used": sys_mem.percent,
+        }
+    except ImportError:
+        result["rss_current_mb"] = "psutil not installed (pip install psutil for accurate RSS)"
+    
+    # 3. tracemalloc top memory consumers
+    if tracemalloc.is_tracing():
+        snapshot = tracemalloc.take_snapshot()
+        # Filter out importlib and tracemalloc internal frames
+        snapshot = snapshot.filter_traces([
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap_external>"),
+            tracemalloc.Filter(False, tracemalloc.__file__),
+        ])
+        top_stats = snapshot.statistics("lineno")
+        result["tracemalloc_top_10"] = [
+            {
+                "file": str(stat.traceback),
+                "size_kb": round(stat.size / 1024, 2),
+                "count": stat.count,
+            }
+            for stat in top_stats[:10]
+        ]
+        current, peak = tracemalloc.get_traced_memory()
+        result["tracemalloc_current_mb"] = round(current / (1024 * 1024), 2)
+        result["tracemalloc_peak_mb"] = round(peak / (1024 * 1024), 2)
+    else:
+        result["tracemalloc"] = "Not tracing (start with tracemalloc.start())"
+    
+    # 4. Agent memories count
+    try:
+        from agent_boilerplate.boilerplate.agent_boilerplate import agent_boilerplate
+        result["agent_memories_count"] = len(agent_boilerplate.agent_memories)
+        result["agent_memories_max"] = agent_boilerplate.MAX_AGENT_MEMORIES
+        result["agent_memory_ids"] = list(agent_boilerplate.agent_memories.keys())
+    except Exception as e:
+        result["agent_memories"] = f"Error: {e}"
+    
+    # 5. GC stats
+    result["gc_stats"] = {
+        f"gen{i}": gc.get_count()[i] for i in range(3)
+    }
+    result["gc_thresholds"] = gc.get_threshold()
+    
+    return result
+
+
+@app.get("/debug/gc")
+async def debug_gc():
+    """Force a garbage collection cycle and return stats."""
+    before = gc.get_count()
+    collected = gc.collect()
+    after = gc.get_count()
+    return {
+        "collected_objects": collected,
+        "before": before,
+        "after": after,
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

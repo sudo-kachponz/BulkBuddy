@@ -1,8 +1,11 @@
 import os
 import uuid
+import glob
+import time
+import threading
 import pandas as pd
 from fpdf import FPDF
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import smtplib
@@ -11,6 +14,34 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
 router = APIRouter(prefix="/api")
+
+
+def _cleanup_temp_files(*file_paths: str, delay: int = 60):
+    """Delete temp report files after a delay (runs in background thread)."""
+    def _delete():
+        time.sleep(delay)
+        for fp in file_paths:
+            try:
+                if os.path.exists(fp):
+                    os.remove(fp)
+                    print(f"🗑️  Cleaned up temp file: {fp}")
+            except OSError as e:
+                print(f"⚠️  Failed to clean temp file {fp}: {e}")
+    t = threading.Thread(target=_delete, daemon=True)
+    t.start()
+
+
+def cleanup_old_reports(max_age_hours: int = 2):
+    """Clean up any stale report files older than max_age_hours."""
+    cutoff = time.time() - (max_age_hours * 3600)
+    for pattern in ["/tmp/laporan_nasabah_*.xlsx", "/tmp/laporan_nasabah_*.pdf"]:
+        for fp in glob.glob(pattern):
+            try:
+                if os.path.getmtime(fp) < cutoff:
+                    os.remove(fp)
+                    print(f"🗑️  Cleaned stale report: {fp}")
+            except OSError:
+                pass
 
 class ReportRequest(BaseModel):
     data: List[Dict[str, Any]]
@@ -131,6 +162,8 @@ async def generate_reports(req: ReportRequest):
                 "excel_path": excel_path,
                 "pdf_path": pdf_path
             }
+    # Schedule temp file cleanup (60s delay to let downloads finish)
+    _cleanup_temp_files(excel_path, pdf_path)
 
     return {
         "message": "Reports generated and email sent successfully!" if req.send_email else "Reports generated",
