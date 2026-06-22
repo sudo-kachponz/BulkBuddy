@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Mail, Check, X } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import ChatArea from './components/ChatArea'
 import InputBar from './components/InputBar'
@@ -29,66 +28,6 @@ function Toast({ toast, onClose }) {
   )
 }
 
-/* ── Email Modal Component ── */
-function EmailModal({ isOpen, onClose, onConfirm }) {
-  const [selectedEmail, setSelectedEmail] = useState("neutracksudo@gmail.com")
-  const [customEmail, setCustomEmail] = useState("")
-
-  if (!isOpen) return null
-
-  const handleConfirm = () => {
-    const emailToSend = selectedEmail === 'custom' ? customEmail : selectedEmail
-    if (!emailToSend || !emailToSend.includes('@')) {
-      alert("Masukkan email yang valid")
-      return
-    }
-    onConfirm(emailToSend)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in fade-in zoom-in duration-200">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><Mail size={18} className="text-primary-500"/> Kirim Laporan via Email</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
-        </div>
-        <p className="text-sm text-slate-500 mb-4">Pilih alamat email penerima laporan PDF dan Excel ini.</p>
-        
-        <div className="space-y-3 mb-5">
-          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-            <input type="radio" name="emailSelect" checked={selectedEmail === 'neutracksudo@gmail.com'} onChange={() => setSelectedEmail('neutracksudo@gmail.com')} className="w-4 h-4 text-primary-600 focus:ring-primary-500"/>
-            <span className="text-sm font-medium text-slate-700">neutracksudo@gmail.com (CTO)</span>
-          </label>
-          
-          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
-            <input type="radio" name="emailSelect" checked={selectedEmail === 'custom'} onChange={() => setSelectedEmail('custom')} className="w-4 h-4 text-primary-600 focus:ring-primary-500"/>
-            <div className="w-full">
-              <span className="text-sm font-medium text-slate-700 block mb-1">Email Lainnya</span>
-              {selectedEmail === 'custom' && (
-                <input 
-                  type="email" 
-                  value={customEmail}
-                  onChange={e => setCustomEmail(e.target.value)}
-                  placeholder="Masukkan alamat email"
-                  className="w-full mt-1 px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  autoFocus
-                />
-              )}
-            </div>
-          </label>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors text-sm cursor-pointer">Batal</button>
-          <button onClick={handleConfirm} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-medium hover:from-primary-700 hover:to-primary-600 rounded-xl transition-colors text-sm shadow-md cursor-pointer">
-            <Check size={16}/> Kirim Sekarang
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* ══════════════════════════════════════════
    ═  MAIN APP
    ══════════════════════════════════════════ */
@@ -103,12 +42,8 @@ export default function App() {
   const [activeSheetName, setActiveSheetName] = useState(null)
   
   // Chat History via custom hook
-  const { sessions, loadSessions, getSession, createSession, updateSession, deleteSession } = useChatHistory()
+  const { sessions, loadSessions, getSession, createSession, updateSession } = useChatHistory()
   const [activeSession, setActiveSession] = useState(null)
-  
-  // Modals state
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
-  const [pendingEmailData, setPendingEmailData] = useState(null)
   
   // Refs to prevent duplicate creations and track sync state
   const activeSessionRef = useRef(null)
@@ -127,18 +62,10 @@ export default function App() {
 
   // Helper to persist current UI state to backend
   const saveCurrentStateToBackend = async (newMessages, newWorkingData) => {
-    const preview = newMessages.length > 0 
-      ? newMessages[newMessages.length - 1].text?.replace(/```[\s\S]*?```/g, '[Data]').substring(0, 40) + '...' 
-      : ''
-    const title = newMessages.length > 0 
-      ? (newMessages[0].text?.substring(0, 25) + '...') 
-      : 'Chat Baru'
-
     if (activeSessionRef.current) {
       await updateSession(activeSessionRef.current.id, {
         messages: newMessages,
-        workingData: newWorkingData,
-        preview
+        workingData: newWorkingData
       })
     } else {
       if (creatingSessionRef.current) return;
@@ -147,9 +74,7 @@ export default function App() {
         const sess = await createSession({
           messages: newMessages,
           workingData: newWorkingData,
-          thread_id: chatThreadIdRef.current,
-          title,
-          preview
+          thread_id: chatThreadIdRef.current
         })
         if (sess) {
           setActiveSession(sess)
@@ -159,17 +84,6 @@ export default function App() {
         creatingSessionRef.current = false;
       }
     }
-  }
-
-  const handleDeleteChat = async (id) => {
-    await deleteSession(id)
-    if (activeSessionRef.current?.id === id) {
-      handleNewChat()
-    }
-  }
-
-  const handleUpdateTitle = async (id, newTitle) => {
-    await updateSession(id, { title: newTitle })
   }
 
   const showToast = (msg, type = 'success') => {
@@ -228,7 +142,6 @@ export default function App() {
       })
 
       let finalSpreadsheetData = null
-      let finalOptionsData = null
 
       while (true) {
         const { value, done } = await reader.read()
@@ -274,7 +187,6 @@ export default function App() {
                 // Live parse JSON array
                 const jsonStart = aiText.indexOf('```json');
                 let spreadsheetData = null;
-                let optionsData = null;
                 if (jsonStart !== -1) {
                   const jsonEnd = aiText.indexOf('```', jsonStart + 7);
                   let jsonStr = '';
@@ -287,27 +199,10 @@ export default function App() {
                   const objectMatches = jsonStr.match(/\{[^{}]+\}/g);
                   if (objectMatches) {
                     spreadsheetData = [];
-                    optionsData = [];
                     for (const obj of objectMatches) {
-                      try {
-                        const parsed = JSON.parse(obj);
-                        if (parsed.type === 'sheet_option' || parsed.url) {
-                          optionsData.push(parsed);
-                        } else {
-                          spreadsheetData.push(parsed);
-                        }
-                      } catch (e) { }
+                      try { spreadsheetData.push(JSON.parse(obj)); } catch (e) { }
                     }
-                    if (spreadsheetData.length > 0) {
-                      finalSpreadsheetData = spreadsheetData;
-                    } else {
-                      spreadsheetData = null;
-                    }
-                    if (optionsData.length > 0) {
-                      finalOptionsData = optionsData;
-                    } else {
-                      optionsData = null;
-                    }
+                    finalSpreadsheetData = spreadsheetData
                   }
                 }
 
@@ -316,27 +211,8 @@ export default function App() {
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
                     updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
-                      const mergedMap = new Map();
-                      workingData.forEach(r => mergedMap.set(String(r.id), r));
-                      spreadsheetData.forEach(r => {
-                        const rid = String(r.id);
-                        if (mergedMap.has(rid)) {
-                          mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
-                        } else {
-                          const newRow = createEmptyNasabah(rid);
-                          for (const k in r) {
-                            if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
-                              newRow[k] = r[k];
-                            }
-                          }
-                          mergedMap.set(rid, newRow);
-                        }
-                      });
-                      updated[aiMessageIndex].spreadsheet = Array.from(mergedMap.values());
+                      updated[aiMessageIndex].spreadsheet = [...workingData, ...spreadsheetData];
                       updated[aiMessageIndex].dataCards = spreadsheetData;
-                    }
-                    if (optionsData && optionsData.length > 0) {
-                      updated[aiMessageIndex].sheetOptions = optionsData;
                     }
                   }
                   return updated
@@ -380,24 +256,8 @@ export default function App() {
       setMessages(prev => {
         let finalWorkingData = workingData
         if (finalSpreadsheetData) {
-          const mergedMap = new Map();
-          workingData.forEach(r => mergedMap.set(String(r.id), r));
-          finalSpreadsheetData.forEach(r => {
-            const rid = String(r.id);
-            if (mergedMap.has(rid)) {
-              mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
-            } else {
-              const newRow = createEmptyNasabah(rid);
-              for (const k in r) {
-                if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
-                  newRow[k] = r[k];
-                }
-              }
-              mergedMap.set(rid, newRow);
-            }
-          });
-          finalWorkingData = Array.from(mergedMap.values());
-          setWorkingData(finalWorkingData)
+           finalWorkingData = [...workingData, ...finalSpreadsheetData]
+           setWorkingData(finalWorkingData)
         }
         // Save state to backend asynchronously outside the render phase
         setTimeout(() => saveCurrentStateToBackend(prev, finalWorkingData), 0)
@@ -429,8 +289,8 @@ export default function App() {
   }
 
   /* ── Handle user sending message ── */
-  const handleSend = useCallback(async ({ text, displayText, files, previews }) => {
-    const userMsg = { role: 'user', text: displayText || text, files, previews }
+  const handleSend = useCallback(async ({ text, files, previews }) => {
+    const userMsg = { role: 'user', text, files, previews }
     setMessages(prev => [...prev, userMsg])
 
     const hasFiles = files && files.length > 0
@@ -542,7 +402,7 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     handleSend({ text: `Tolong gunakan spreadsheet ini: ${cleanSheetName}. Ambil dan baca seluruh isinya, lalu tambahkan baris data OCR saat ini ke dalamnya. SETELAH ITU, KAMU DILARANG MERINGKAS ATAU MENAMPILKAN DATANYA MENGGUNAKAN TABEL MARKDOWN (| Field | Value |). KAMU HANYA BOLEH MENGELUARKAN 1 BUAH BLOK JSON ARRAY ( \`\`\`json ) yang berisi SELURUH DATA (lama + baru). Tolong patuhi ini agar UI Frontend tidak error!`, files: [], previews: [] })
   }, [handleSend])
 
-  /* ── New chat (Auto-creates Sheet) ── */
+  /* ── New chat ── */
   const handleNewChat = () => {
     setMessages([])
     setWorkingData([])
@@ -550,38 +410,6 @@ Setelah kamu mengeluarkan blok JSON tersebut, tuliskan kalimat ringkas biasa di 
     setActiveSheetName(null)
     setIsTyping(false)
     chatThreadIdRef.current = crypto.randomUUID()
-    activeSessionRef.current = null
-    creatingSessionRef.current = false
-
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const time = new Date().toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '');
-    const sheetName = `SUTET-${dd}/${mm}/${yyyy}-${time}`;
-    setActiveSheetName(sheetName);
-    const dateStr = `${dd}/${mm}/${yyyy}`;
-    const prompt = `Gunakan tool Google MCP untuk mencari spreadsheet template di Google Drive bernama "TEMPLATE_SUTET", lalu duplikat/copy file tersebut.
-WAJIB: Letakkan file hasil duplikat tersebut DI DALAM FOLDER YANG SAMA dengan lokasi template aslinya.
-Ganti nama file hasil copy-nya menjadi persis "${sheetName}". 
-
-Setelah berhasil, SANGAT PENTING: 
-1. Keluarkan output HANYA berupa JSON Array di dalam blok \`\`\`json (tanpa teks pengantar atau penutup apapun).
-2. Setiap objek di dalam JSON Array WAJIB memiliki format persis seperti ini:
-[
-  {
-    "type": "sheet_option",
-    "title": "${sheetName}",
-    "url": "<URL_ASLI_DARI_FILE_DUPLIKAT>",
-    "date": "${dateStr}"
-  }
-]
-Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya dari file yang baru saja kamu duplikat.`;
-    
-    // Auto trigger
-    setTimeout(() => {
-      handleSend({ text: prompt, displayText: `✨ Membuat Spreadsheet Baru — ${sheetName}`, files: [], previews: [] });
-    }, 100);
   }
 
   /* ── Load chat from history ── */
@@ -602,34 +430,27 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
   }
 
   /* ── Confirm Send Flow (Live Data -> CTO) ── */
-  const promptEmailConfirm = (rows) => {
-    setPendingEmailData(rows)
-    setEmailModalOpen(true)
-  }
+  const handleConfirmSend = async (rows, targetEmail = "neutracksudo@gmail.com") => {
+    showToast(`⏳ Memproses dokumen & mengirim email ke ${targetEmail}...`, 'info')
 
-  const handleConfirmSend = async (email) => {
-    const rows = pendingEmailData
-    setEmailModalOpen(false)
-    showToast(`⏳ Memproses dokumen & mengirim email ke ${email}...`, 'info')
-
-    const userMsg = { role: 'user', text: `Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke ${email} beserta lampirannya secara langsung.`, files: [], previews: [] }
+    const userMsg = { role: 'user', text: `Tolong buatkan dokumen PDF & Excel lalu kirimkan email ke ${targetEmail} beserta lampirannya secara langsung.`, files: [], previews: [] }
     setMessages(prev => [...prev, userMsg])
 
     try {
       const response = await fetch('http://localhost:8000/api/generate-reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: rows || [], send_email: true, to_email: email })
+        body: JSON.stringify({ data: rows || [], send_email: true, to_email: targetEmail })
       })
       const result = await response.json()
       if (result.error) throw new Error(result.error)
 
-      showToast(`📧 Email beserta lampiran berhasil dikirim ke ${email}!`, 'success')
+      showToast(`📧 Email beserta lampiran berhasil dikirim ke ${targetEmail}!`, 'success')
 
       // Tambahkan response AI instan
       const aiMsg = {
         role: 'model',
-        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke penerima (*${email}*).`
+        text: `✅ **Selesai!**\n\nDokumen PDF dan Excel telah dibuat di server lokal dan langsung dilampirkan (*attached*) pada email fisik. Email laporan telah berhasil dikirim ke CTO (*${targetEmail}*).`
       }
       setMessages(prev => {
         const newMsgs = [...prev, aiMsg]
@@ -678,7 +499,6 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
   return (
     <div className="h-screen flex font-poppins bg-[#f0f4f8]">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <EmailModal isOpen={emailModalOpen} onClose={() => setEmailModalOpen(false)} onConfirm={handleConfirmSend} />
 
       {/* Mandiri Logo — pojok kanan atas */}
       <div className="fixed top-3 right-5 z-50">
@@ -692,8 +512,6 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
         onNewChat={handleNewChat}
         historyData={sessions}
         onSelectChat={handleSelectChat}
-        onUpdateTitle={handleUpdateTitle}
-        onDeleteChat={handleDeleteChat}
       />
 
       {/* Main Chat Panel */}
@@ -722,9 +540,9 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
             messages={messages} 
             isTyping={isTyping} 
             onExportPdf={handleExportPdf}
-            onSendCto={promptEmailConfirm}
+            onSendCto={handleConfirmSend}
             onSaveToSheet={handleSaveToSheet}
-            onConfirmSend={promptEmailConfirm}
+            onConfirmSend={handleConfirmSend}
             onNewSheet={handleNewSheet}
             onExistingSheet={handleExistingSheet}
             onSelectExistingSheet={handleSelectExistingSheet}

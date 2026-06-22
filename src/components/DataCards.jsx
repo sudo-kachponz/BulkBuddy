@@ -107,6 +107,18 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
   const [draft, setDraft] = useState('')
   const [savedRows, setSavedRows] = useState([])
   const [hasChanges, setHasChanges] = useState(false)
+  const [showEmailInput, setShowEmailInput] = useState(false)
+  const [emailInput, setEmailInput] = useState('neutracksudo@gmail.com')
+  const [emailHistory, setEmailHistory] = useState([])
+
+  // Load email history on mount
+  useEffect(() => {
+    try {
+      const history = JSON.parse(localStorage.getItem('emailHistory')) || ['neutracksudo@gmail.com']
+      setEmailHistory(history)
+      if (history.length > 0) setEmailInput(history[0])
+    } catch(e) {}
+  }, [])
 
   // Update rows if new data streams in (length changes)
   useEffect(() => {
@@ -141,6 +153,18 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
     setSavedRows(rows.map(r => r.id))
     setHasChanges(false)
     onSaveToSheet && onSaveToSheet(rows, payload)
+  }
+
+  const handleSendCto = () => {
+    if (!emailInput || !emailInput.includes('@')) return
+    
+    // Save to history (keep max 5 unique)
+    const newHistory = [emailInput, ...emailHistory.filter(e => e !== emailInput)].slice(0, 5)
+    setEmailHistory(newHistory)
+    localStorage.setItem('emailHistory', JSON.stringify(newHistory))
+    
+    setShowEmailInput(false)
+    onSendCto && onSendCto(rows, emailInput)
   }
 
   return (
@@ -248,13 +272,39 @@ export function SpreadsheetTable({ data, onExportPdf, onSendCto, onSaveToSheet }
           Export PDF
         </button>
 
-        <button onClick={() => onSendCto(rows)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
-            bg-gradient-to-r from-amber-400 to-yellow-400 text-white shadow-md shadow-amber-400/25
-            hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-200">
-          <img src={mailIcon} alt="Gmail" className="w-4 h-4 object-contain" />
-          Kirim ke CTO
-        </button>
+        {showEmailInput ? (
+          <div className="flex items-center gap-2 bg-white rounded-xl shadow-sm border border-amber-200 p-1 pl-3 animate-in slide-in-from-right-2">
+            <input 
+              type="email" 
+              list="email-history"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="Masukkan email..."
+              className="outline-none text-sm w-48 text-slate-700 bg-transparent font-medium"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleSendCto()}
+            />
+            <datalist id="email-history">
+              {emailHistory.map(email => <option key={email} value={email} />)}
+            </datalist>
+            <button onClick={handleSendCto} title="Kirim Email"
+              className="p-1.5 bg-gradient-to-r from-amber-400 to-yellow-400 text-white rounded-lg hover:shadow-md cursor-pointer transition-all">
+              <Send size={16} />
+            </button>
+            <button onClick={() => setShowEmailInput(false)} title="Batal"
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setShowEmailInput(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer
+              bg-gradient-to-r from-amber-400 to-yellow-400 text-white shadow-md shadow-amber-400/25
+              hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-200">
+            <img src={mailIcon} alt="Gmail" className="w-4 h-4 object-contain" />
+            Kirim Laporan
+          </button>
+        )}
       </div>
     </div>
   )
