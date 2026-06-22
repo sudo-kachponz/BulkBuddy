@@ -71,7 +71,7 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
   if (message.text && message.text.toLowerCase().includes('pilih spreadsheet mana yang ingin digunakan')) {
     const lines = message.text.split('\n');
     for (const line of lines) {
-      const match = line.match(/^\d+\.\s+(.+)$/);
+      const match = line.match(/^(?:\d+\.|[-*])\s+(.+)$/);
       if (match) {
         spreadsheetOptions.push(match[1].trim());
       }
@@ -119,8 +119,8 @@ function AIBubble({ message, onExportPdf, onSendCto, onSaveToSheet, onConfirmSen
           </div>
         )}
 
-        {/* Data cards (only show if it is an OCR task) */}
-        {message.dataCards && message.dataCards.length > 0 && message.isOcr && (
+        {/* Data cards (only show if JSON array is present) */}
+        {message.dataCards && message.dataCards.length > 0 && (
           <div className="space-y-2">
             {message.dataCards.map((card, i) => (
               <ExtractedDataCard key={i} data={card} />
