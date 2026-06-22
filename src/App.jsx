@@ -228,6 +228,7 @@ export default function App() {
       })
 
       let finalSpreadsheetData = null
+      let finalOptionsData = null
 
       while (true) {
         const { value, done } = await reader.read()
@@ -273,6 +274,7 @@ export default function App() {
                 // Live parse JSON array
                 const jsonStart = aiText.indexOf('```json');
                 let spreadsheetData = null;
+                let optionsData = null;
                 if (jsonStart !== -1) {
                   const jsonEnd = aiText.indexOf('```', jsonStart + 7);
                   let jsonStr = '';
@@ -285,10 +287,27 @@ export default function App() {
                   const objectMatches = jsonStr.match(/\{[^{}]+\}/g);
                   if (objectMatches) {
                     spreadsheetData = [];
+                    optionsData = [];
                     for (const obj of objectMatches) {
-                      try { spreadsheetData.push(JSON.parse(obj)); } catch (e) { }
+                      try {
+                        const parsed = JSON.parse(obj);
+                        if (parsed.type === 'sheet_option' || parsed.url) {
+                          optionsData.push(parsed);
+                        } else {
+                          spreadsheetData.push(parsed);
+                        }
+                      } catch (e) { }
                     }
-                    finalSpreadsheetData = spreadsheetData
+                    if (spreadsheetData.length > 0) {
+                      finalSpreadsheetData = spreadsheetData;
+                    } else {
+                      spreadsheetData = null;
+                    }
+                    if (optionsData.length > 0) {
+                      finalOptionsData = optionsData;
+                    } else {
+                      optionsData = null;
+                    }
                   }
                 }
 
@@ -297,8 +316,27 @@ export default function App() {
                   if (aiMessageIndex !== -1 && updated[aiMessageIndex]) {
                     updated[aiMessageIndex].text = getDisplayHtml(aiText).trim()
                     if (spreadsheetData && spreadsheetData.length > 0) {
-                      updated[aiMessageIndex].spreadsheet = [...workingData, ...spreadsheetData];
+                      const mergedMap = new Map();
+                      workingData.forEach(r => mergedMap.set(String(r.id), r));
+                      spreadsheetData.forEach(r => {
+                        const rid = String(r.id);
+                        if (mergedMap.has(rid)) {
+                          mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
+                        } else {
+                          const newRow = createEmptyNasabah(rid);
+                          for (const k in r) {
+                            if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
+                              newRow[k] = r[k];
+                            }
+                          }
+                          mergedMap.set(rid, newRow);
+                        }
+                      });
+                      updated[aiMessageIndex].spreadsheet = Array.from(mergedMap.values());
                       updated[aiMessageIndex].dataCards = spreadsheetData;
+                    }
+                    if (optionsData && optionsData.length > 0) {
+                      updated[aiMessageIndex].sheetOptions = optionsData;
                     }
                   }
                   return updated
@@ -342,8 +380,24 @@ export default function App() {
       setMessages(prev => {
         let finalWorkingData = workingData
         if (finalSpreadsheetData) {
-           finalWorkingData = [...workingData, ...finalSpreadsheetData]
-           setWorkingData(finalWorkingData)
+          const mergedMap = new Map();
+          workingData.forEach(r => mergedMap.set(String(r.id), r));
+          finalSpreadsheetData.forEach(r => {
+            const rid = String(r.id);
+            if (mergedMap.has(rid)) {
+              mergedMap.set(rid, { ...mergedMap.get(rid), ...r });
+            } else {
+              const newRow = createEmptyNasabah(rid);
+              for (const k in r) {
+                if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
+                  newRow[k] = r[k];
+                }
+              }
+              mergedMap.set(rid, newRow);
+            }
+          });
+          finalWorkingData = Array.from(mergedMap.values());
+          setWorkingData(finalWorkingData)
         }
         // Save state to backend asynchronously outside the render phase
         setTimeout(() => saveCurrentStateToBackend(prev, finalWorkingData), 0)
