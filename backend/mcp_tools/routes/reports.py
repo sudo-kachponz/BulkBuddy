@@ -1,8 +1,11 @@
 import os
 import uuid
+import glob
+import time
+import threading
 import pandas as pd
 from fpdf import FPDF
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import smtplib
@@ -12,13 +15,35 @@ from email.mime.application import MIMEApplication
 
 router = APIRouter(prefix="/api")
 
-class ReportRequest(BaseModel):
-    data: List[Dict[str, Any]]
-    send_email: bool = False
-    to_email: str = "neutracksudo@gmail.com"
 
-class UpdateSheetRequest(BaseModel):
-    sheet_name: str
+def _cleanup_temp_files(*file_paths: str, delay: int = 60):
+    """Delete temp report files after a delay (runs in background thread)."""
+    def _delete():
+        time.sleep(delay)
+        for fp in file_paths:
+            try:
+                if os.path.exists(fp):
+                    os.remove(fp)
+                    print(f"🗑️  Cleaned up temp file: {fp}")
+            except OSError as e:
+                print(f"⚠️  Failed to clean temp file {fp}: {e}")
+    t = threading.Thread(target=_delete, daemon=True)
+    t.start()
+
+
+def cleanup_old_reports(max_age_hours: int = 2):
+    """Clean up any stale report files older than max_age_hours."""
+    cutoff = time.time() - (max_age_hours * 3600)
+    for pattern in ["/tmp/laporan_nasabah_*.xlsx", "/tmp/laporan_nasabah_*.pdf"]:
+        for fp in glob.glob(pattern):
+            try:
+                if os.path.getmtime(fp) < cutoff:
+                    os.remove(fp)
+                    print(f"🗑️  Cleaned stale report: {fp}")
+            except OSError:
+                pass
+
+class ReportRequest(BaseModel):
     data: List[Dict[str, Any]]
     send_email: bool = False
     to_email: str = "neutracksudo@gmail.com"
@@ -48,147 +73,11 @@ def send_email_with_attachments(to_email: str, subject: str, html_body: str, fil
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
 
-@router.post("/update-sheet")
-async def update_sheet_api(request: UpdateSheetRequest):
-    try:
-        columns_order = [
-            "nama", "gelarsbl", "gelarsdh", "kelamin", "tgl_lhr", "kota_lhr", 
-            "warga_negara", "no_ktp", "kota_ktp", "exp_ktp", "jenis_id_tambahan", 
-            "no_id_tambahan", "ibu_kandung", "sts_kawin", "alamat1", "alamat2", 
-            "kodepos", "telp_rumah", "handphone", "email", "pekerjaan", "jabatan", 
-            "employer_name", "kode_industri", "tgl_mulai", "gaji", "pen_lain", 
-            "cif_no", "currency", "produk", "biaya_admin", "tujuan_buka", 
-            "kode_cabang", "bansos_type", "consent"
-        ]
-        
-        sheet_values = []
-        for row in request.data:
-            formatted_row = [str(row.get(col, "")) for col in columns_order]
-            sheet_values.append(formatted_row)
-
-        try:
-            import gspread
-        except ImportError:
-            raise Exception("Library 'gspread' tidak ditemukan. Jalankan: pip install gspread google-auth")
-
-        # Pastikan file credentials.json (Service Account) ada di root folder
-        creds_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'credentials.json')
-        if not os.path.exists(creds_path):
-            raise Exception(f"File kredensial Service Account tidak ditemukan di {creds_path}. Silakan unduh dari Google Cloud Console dan simpan sebagai 'credentials.json' di folder root BulkBuddy.")
-
-        gc = gspread.service_account(filename=creds_path)
-        
-        # Cek apakah yang dikirim FE adalah URL atau sekadar nama file
-        if "docs.google.com/spreadsheets" in request.sheet_name:
-             spreadsheet = gc.open_by_url(request.sheet_name)
-        else:
-             spreadsheet = gc.open(request.sheet_name)
-             
-        worksheet = spreadsheet.sheet1
-        
-        # Hapus data lama (mulai dari baris 2 ke bawah, menyisakan header) dan timpa
-        worksheet.batch_clear(["A2:AI"]) 
-        
-        if sheet_values:
-            worksheet.update(values=sheet_values, range_name='A2')
-
-        return {"status": "success", "message": f"Data saved to {request.sheet_name} instantly!"}
-
-    except Exception as e:
-        print(f"Error updating sheet: {type(e).__name__} - {e}")
-        from fastapi import HTTPException
-        if "SpreadsheetNotFound" in str(type(e).__name__):
-            raise HTTPException(status_code=404, detail="Spreadsheet tidak ditemukan oleh Service Account. Pastikan file sudah di-share ke email bulkbuddy@animated-vector-434910-g3.iam.gserviceaccount.com")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/get-sheet")
-async def get_sheet_api(sheet_name: str):
-    try:
-        import gspread
-        creds_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'credentials.json')
-        gc = gspread.service_account(filename=creds_path)
-        
-        import urllib.parse
-        decoded_name = urllib.parse.unquote(sheet_name)
-
-        if "docs.google.com/spreadsheets" in decoded_name:
-             spreadsheet = gc.open_by_url(decoded_name)
-        else:
-             spreadsheet = gc.open(decoded_name)
-             
-        worksheet = spreadsheet.sheet1
-        
-        # Ambil semua data
-        all_values = worksheet.get_all_values()
-        if len(all_values) <= 1:
-            return {"status": "success", "data": []}
-            
-        columns_order = [
-            "nama", "gelarsbl", "gelarsdh", "kelamin", "tgl_lhr", "kota_lhr", 
-            "warga_negara", "no_ktp", "kota_ktp", "exp_ktp", "jenis_id_tambahan", 
-            "no_id_tambahan", "ibu_kandung", "sts_kawin", "alamat1", "alamat2", 
-            "kodepos", "telp_rumah", "handphone", "email", "pekerjaan", "jabatan", 
-            "employer_name", "kode_industri", "tgl_mulai", "gaji", "pen_lain", 
-            "cif_no", "currency", "produk", "biaya_admin", "tujuan_buka", 
-            "kode_cabang", "bansos_type", "consent"
-        ]
-        
-        # Lewati header (baris pertama)
-        rows = all_values[1:]
-        
-        data = []
-        for idx, row in enumerate(rows):
-            row_dict = {"id": str(idx + 1)}
-            for col_idx, col_name in enumerate(columns_order):
-                val = row[col_idx] if col_idx < len(row) else ""
-                # Hapus tanda kutip ('08...) yang ditambahkan saat write
-                if val.startswith("'"):
-                    val = val[1:]
-                row_dict[col_name] = val
-            data.append(row_dict)
-            
-        return {"status": "success", "data": data}
-        
-    except Exception as e:
-        print(f"Error getting sheet: {type(e).__name__} - {e}")
-        from fastapi import HTTPException
-        if "SpreadsheetNotFound" in str(type(e).__name__):
-            raise HTTPException(status_code=404, detail="Spreadsheet tidak ditemukan oleh Service Account.")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/generate-reports")
 async def generate_reports(req: ReportRequest):
     data = req.data
     if not data:
         return {"error": "No data provided"}
-
-    # Prevent Excel from dropping leading zeros or using scientific notation
-    target_columns = ["No Telp Rumah", "No. Handphone", "NO KTP / PASSPORT", "NO IDENTITAS TAMBAHAN", "KODEPOS", "CIF_NO"]
-    for row in data:
-        # Add template default values
-        row["KERJAPSW"] = row.get("KERJAPSW", "PSW")
-        row["WARGA NEGARA"] = row.get("WARGA NEGARA", "000")
-        row["EMPLOYER NAME"] = row.get("EMPLOYER NAME", "PT SUTET")
-        row["KODE_INDUSTRI"] = row.get("KODE_INDUSTRI", "09")
-        from datetime import datetime
-        row["TGL_MULA"] = row.get("TGL_MULA", datetime.now().strftime("%d%m%Y"))
-        row["GAJI"] = row.get("GAJI", "300000")
-        row["PEN_LAIN"] = row.get("PEN_LAIN", "0")
-        row["CIF_NO"] = row.get("CIF_NO", "0")
-        row["CURRENCY"] = row.get("CURRENCY", "IDR")
-        row["PRODUK"] = row.get("PRODUK", "TABMANDIRI")
-        row["BIAYA ADMIN KHU"] = row.get("BIAYA ADMIN KHU", "")
-        row["TUJUAN BUKA REKENING"] = row.get("TUJUAN BUKA REKENING", "A")
-        row["KODE CABANG"] = row.get("KODE CABANG", "12000")
-        row["BANSOS TYPE"] = row.get("BANSOS TYPE", "")
-        row["CONSENT"] = row.get("CONSENT", "YYYY")
-
-        row["EXP_KTP/PASSPORT"] = row.get("EXP_KTP/PASSPORT", "000000")
-
-        for col in target_columns:
-            if col in row and row[col]:
-                val_str = str(row[col]).strip()
-                row[col] = val_str
 
     unique_id = str(uuid.uuid4())[:8]
     excel_path = f"/tmp/laporan_nasabah_{unique_id}.xlsx"
@@ -196,38 +85,37 @@ async def generate_reports(req: ReportRequest):
 
     # 1. Generate Excel using Pandas
     df = pd.DataFrame(data)
-    try:
-        from openpyxl.styles import Font, PatternFill, Border, Side
-        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Sheet1')
-            worksheet = writer.sheets['Sheet1']
-            
-            header_font = Font(name='Arial', size=16, bold=True)
-            header_fill = PatternFill(start_color="FFFFFF00", end_color="FFFFFF00", fill_type="solid")
-            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    df.to_excel(excel_path, index=False)
 
-            # Style header row
-            for cell in worksheet[1]:
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.border = thin_border
-                
-            # Resize columns and apply borders to all cells
-            for col in worksheet.columns:
-                max_length = 0
-                column = col[0].column_letter
-                for cell in col:
-                    cell.border = thin_border
-                    try:
-                        if cell.value:
-                            max_length = max(max_length, len(str(cell.value)))
-                    except:
-                        pass
-                worksheet.column_dimensions[column].width = max_length + 3
-    except ImportError:
-        df.to_excel(excel_path, index=False)
+    # 2. Generate PDF using FPDF
+    class PDF(FPDF):
+        def header(self):
+            self.set_font("helvetica", "B", 12)
+            self.cell(0, 10, "Laporan Data Nasabah (BulkBuddy)", align="C")
+            self.ln(15)
 
+    pdf = PDF(orientation="L", unit="mm", format="A4")
+    pdf.add_page()
+    
+    columns = ["nama", "no_ktp", "kelamin", "tgl_lhr", "handphone", "produk", "kode_cabang"]
+    col_widths = [45, 45, 15, 25, 35, 30, 25]
+    
+    # Table Header
+    pdf.set_font("helvetica", "B", 8)
+    for i, col in enumerate(columns):
+        pdf.cell(col_widths[i], 8, str(col).upper(), border=1, align="C")
+    pdf.ln()
 
+    # Table Rows
+    pdf.set_font("helvetica", "", 8)
+    for row in data:
+        for i, col in enumerate(columns):
+            val = str(row.get(col, ""))[:25]
+            pdf.cell(col_widths[i], 8, val, border=1)
+        pdf.ln()
+
+    pdf.output(pdf_path)
+    
     if req.send_email:
         subject = "[Permohonan Pembukaan Rekening BULK Tabungan Reguler - PLN SUTET]"
         html_body = f"""
@@ -267,14 +155,18 @@ async def generate_reports(req: ReportRequest):
         Demikian disampaikan, atas perhatian dan kerjasama yang baik diucapkan terima kasih.
         """
         try:
-            send_email_with_attachments(req.to_email, subject, html_body, [excel_path])
+            send_email_with_attachments(req.to_email, subject, html_body, [pdf_path, excel_path])
         except Exception as e:
             return {
                 "error": f"Failed to send email: {str(e)}. Please check your SMTP_USERNAME and SMTP_PASSWORD in .env.",
-                "excel_path": excel_path
+                "excel_path": excel_path,
+                "pdf_path": pdf_path
             }
+    # Schedule temp file cleanup (60s delay to let downloads finish)
+    _cleanup_temp_files(excel_path, pdf_path)
 
     return {
         "message": "Reports generated and email sent successfully!" if req.send_email else "Reports generated",
-        "excel_path": excel_path
+        "excel_path": excel_path,
+        "pdf_path": pdf_path
     }

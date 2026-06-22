@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+gunicorn
 supabase
 langchain
 langchain-core
@@ -11,3 +12,4 @@ google-auth-oauthlib
 google-api-python-client
 pydantic
 pandas
+psutil

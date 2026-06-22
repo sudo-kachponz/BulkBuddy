@@ -13,10 +13,13 @@ The module provides a central place for agent-related functionality, including:
 """
 
 from typing import Dict, Any, Tuple, List, Optional
+from collections import OrderedDict
 import json
 from pathlib import Path
 import os
 import sys
+import gc
+import logging
 from datetime import datetime, timezone
 from supabase import create_client, Client
 import uuid
@@ -30,6 +33,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage, AIMessageChunk, BaseMessage, AIMessage, ToolMessage
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
+logger = logging.getLogger(__name__)
+
 
 class AgentBoilerplate:
     """
@@ -37,20 +42,39 @@ class AgentBoilerplate:
     This class is responsible for the core agent functionality.
     """
     
+    # Maximum number of agent memories to keep in RAM.
+    # Oldest entries are evicted when this limit is exceeded.
+    MAX_AGENT_MEMORIES = 20
+
     def __init__(self):
         """
         Initialize the AgentBoilerplate.
         
         Sets up the memory management system and tool manager reference.
+        Uses OrderedDict for LRU-style eviction to prevent unbounded RAM growth.
         """
-        # Dictionary to store agent-specific conversation memories
-        self.agent_memories: Dict[str, MemorySaver] = {}
+        # OrderedDict for LRU eviction — prevents unbounded memory growth
+        self.agent_memories: OrderedDict[str, MemorySaver] = OrderedDict()
+
+        # Shared Supabase client for logging (prevents creating a new client per request)
+        self._supabase_log_client: Optional[Client] = None
     
+    def _get_log_client(self) -> Optional[Client]:
+        """Get or create a shared Supabase client for logging."""
+        if self._supabase_log_client is None:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_KEY")
+            if supabase_url and supabase_key:
+                self._supabase_log_client = create_client(supabase_url, supabase_key)
+        return self._supabase_log_client
+
     def get_or_create_memory(self, agent_id: str) -> MemorySaver:
         """
         Get an existing memory for an agent or create a new one if it doesn't exist.
         
-        This ensures each agent has its own persistent conversation memory.
+        Uses LRU eviction: if the number of stored memories exceeds
+        MAX_AGENT_MEMORIES, the oldest (least recently used) entry is removed
+        to free RAM.
         
         Args:
             agent_id: The ID of the agent
@@ -58,7 +82,16 @@ class AgentBoilerplate:
         Returns:
             MemorySaver instance for the agent
         """
-        if agent_id not in self.agent_memories:
+        if agent_id in self.agent_memories:
+            # Move to end (most recently used)
+            self.agent_memories.move_to_end(agent_id)
+        else:
+            # Evict oldest if we're at capacity
+            while len(self.agent_memories) >= self.MAX_AGENT_MEMORIES:
+                evicted_id, evicted_mem = self.agent_memories.popitem(last=False)
+                logger.info("♻️  Evicted agent memory for %s (capacity: %d)", evicted_id, self.MAX_AGENT_MEMORIES)
+                del evicted_mem
+                gc.collect()
             self.agent_memories[agent_id] = MemorySaver()
         return self.agent_memories[agent_id]
     
@@ -232,17 +265,14 @@ class AgentBoilerplate:
                 "timestamp": datetime.now(timezone.utc).isoformat() # Timestamp of formatting
             })
 
-        # 3. Directly insert or update log data in Supabase
-        supabase_url: str | None = os.getenv("SUPABASE_URL")
-        supabase_key: str | None = os.getenv("SUPABASE_KEY")
-
-        if not supabase_url or not supabase_key:
+        # 3. Use shared Supabase client (prevents creating a new client per request → memory leak)
+        supabase = self._get_log_client()
+        if supabase is None:
             print("--- Logging Failed: SUPABASE_URL or SUPABASE_KEY environment variables not set. ---", file=sys.stderr)
             return
 
-        print(f"--- Interacting with Supabase at {supabase_url[:20]}... ---") # Truncate URL for logging
+        print(f"--- Logging interaction via shared Supabase client ---")
         try:
-            supabase: Client = create_client(supabase_url, supabase_key)
             
             # First, check if there's an existing log for this agent_id
             existing_log_response = (
@@ -392,41 +422,42 @@ class AgentBoilerplate:
         invoke_config_with_callbacks = {"configurable": config, "callbacks": [usage_callback]}
         
         # Step 6: Create and invoke the agent
-        if has_tools:
-            # Agent with tools
-            print("Using agent with tools")
-            print("MCP config:", mcp_config)
-            client = MultiServerMCPClient(mcp_config)
-            # Retry get_tools() karena google-mcp butuh beberapa detik initialize
-            import asyncio
-            langchain_tools = None
-            for attempt in range(1, 4):
+        # IMPORTANT: MCP client MUST be closed after use to prevent memory leak
+        client = None
+        try:
+            if has_tools:
+                # Agent with tools
+                print("Using agent with tools")
+                print("MCP config:", mcp_config)
+                client = MultiServerMCPClient(mcp_config)
+                langchain_tools = await client.get_tools()
+                agent = get_react_agent(
+                    model_name=model_name,
+                    temperature=temperature,
+                    langchain_tools=langchain_tools,
+                    memory=memory
+                )
+                response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
+            else:
+                # Agent without tools
+                print("Using agent without tools")
+                agent = get_react_agent(
+                    model_name=model_name,
+                    temperature=temperature,
+                    langchain_tools=[],
+                    memory=memory
+                )
+                response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
+        finally:
+            # Cleanup MCP client to release SSE connections and free memory
+            if client is not None:
                 try:
-                    langchain_tools = await client.get_tools()
-                    break
-                except Exception as mcp_err:
-                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(mcp_err).__name__}: {mcp_err}")
-                    if attempt < 3:
-                        await asyncio.sleep(3)
-            if langchain_tools is None:
-                raise Exception("[MCP] Gagal mendapatkan tools setelah 3 percobaan. Cek log VPS untuk detail.")
-            agent = get_react_agent(
-                model_name=model_name,
-                temperature=temperature,
-                langchain_tools=langchain_tools,
-                memory=memory
-            )
-            response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
-        else:
-            # Agent without tools
-            print("Using agent without tools")
-            agent = get_react_agent(
-                model_name=model_name,
-                temperature=temperature,
-                langchain_tools=[],
-                memory=memory
-            )
-            response = await agent.ainvoke({"messages": [HumanMessage(content=query)]}, invoke_config_with_callbacks)
+                    await client.__aexit__(None, None, None)
+                    logger.info("♻️  MCP client closed successfully")
+                except Exception as cleanup_err:
+                    logger.warning("⚠️  MCP client cleanup error: %s", cleanup_err)
+                client = None
+                gc.collect()
         
         # Extract token counts from usage metadata
         metadata = usage_callback.usage_metadata
@@ -508,21 +539,7 @@ class AgentBoilerplate:
             print("Using agent with tools")
             print("MCP config:", mcp_config)
             client = MultiServerMCPClient(mcp_config)
-            # Retry get_tools() karena google-mcp butuh beberapa detik initialize
-            import asyncio
-            langchain_tools = None
-            for attempt in range(1, 4):
-                try:
-                    langchain_tools = await client.get_tools()
-                    print(f"[MCP] get_tools() berhasil pada attempt {attempt}")
-                    break
-                except Exception as mcp_err:
-                    print(f"[MCP] get_tools() attempt {attempt}/3 failed: {type(mcp_err).__name__}: {mcp_err}")
-                    if attempt < 3:
-                        await asyncio.sleep(3)
-            if langchain_tools is None:
-                langchain_tools = []
-                print("[MCP] Semua attempt gagal, lanjut tanpa tools")
+            langchain_tools = await client.get_tools()
             
             if use_react_text:
                 print(f"Using ReAct text-based agent for {model_name}")
@@ -544,6 +561,9 @@ class AgentBoilerplate:
             agent = get_react_agent(model_name=model_name, temperature=temperature, langchain_tools=[], memory=memory)
         
         agent_creation_end = time.time()
+        
+        # Track if we need to clean up MCP client
+        _mcp_client_to_close = client
 
         # Recursion tracker
         class RecursionTracker(BaseCallbackHandler):
@@ -673,10 +693,17 @@ class AgentBoilerplate:
             await self._log_interaction(agent_id=agent_id, thread_id=thread_id, model_name=model_name, temperature=temperature, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, total_tokens=total_tokens, messages=all_messages, final_response=final_response, tools_used=has_tools, agent_input=agent_input)
 
         finally:
-            # Step 8: Ensure proper cleanup
-            pass
-
-
+            # Step 8: Ensure proper cleanup — close MCP client to release connections
+            if _mcp_client_to_close is not None:
+                try:
+                    await _mcp_client_to_close.__aexit__(None, None, None)
+                    logger.info("♻️  MCP client (stream) closed successfully")
+                except Exception as cleanup_err:
+                    logger.warning("⚠️  MCP client (stream) cleanup error: %s", cleanup_err)
+                finally:
+                    client = None
+                    _mcp_client_to_close = None
+                    gc.collect()
 
 
 # Singleton instance for global use
