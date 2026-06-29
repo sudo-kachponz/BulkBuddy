@@ -165,7 +165,7 @@ export default function ChatArea({ messages, isTyping, onExportPdf, onSendCto, o
   }, [messages, isTyping])
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-8 chat-scroll">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-6 py-4 md:py-8 chat-scroll">
       <div className="max-w-4xl mx-auto space-y-6 w-full">
         {messages.map((msg, i) => (
           msg.role === 'user'

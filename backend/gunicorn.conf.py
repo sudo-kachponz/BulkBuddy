@@ -1,9 +1,14 @@
 # ─────────────────────────────────────────────────────────────────────
 # Gunicorn Configuration for BulkBuddy Backend
-# 
-# Solusi utama untuk "kutukan 6 jam" memory leak:
-# Worker di-recycle otomatis setelah melayani --max-requests request,
-# sehingga RAM dikembalikan ke 0 tanpa downtime.
+#
+# VPS target: 2.12 GB RAM / 1 vCPU
+#
+# Strategi anti-OOM:
+#   1. 1 worker UvicornWorker (single-process = minimum base RAM ~150-200 MB)
+#   2. max_requests=80: worker direcycle setelah 80 request → RAM dikembalikan
+#      lebih sering (vs. 150 sebelumnya)
+#   3. timeout=120: cegah request hung yang menahan RAM terlalu lama
+#   4. limit_request_line & limit_request_fields: cegah request besar masuk RAM
 #
 # Cara pakai:
 #   gunicorn main:app -c gunicorn.conf.py
@@ -12,35 +17,38 @@
 #   pm2 start ecosystem.config.js
 # ─────────────────────────────────────────────────────────────────────
 
-import multiprocessing
-
 # ── Server Socket ──────────────────────────────────────────────────
 bind = "0.0.0.0:8000"
 
 # ── Worker Processes ───────────────────────────────────────────────
-# Untuk VPS 2GB RAM / 1 vCPU, 2 workers sudah optimal.
-# Rumus umum: (2 × CPU) + 1, tapi kita cap di 2 karena RAM terbatas.
-workers = 2
+# 1 worker untuk VPS 2GB RAM / 1 vCPU — lebih dari 1 = OOM
+workers = 1
 
-# Pakai UvicornWorker supaya tetap support async FastAPI
+# UvicornWorker agar FastAPI async tetap berjalan
 worker_class = "uvicorn.workers.UvicornWorker"
 
 # ── Memory Leak Prevention (KUNCI UTAMA) ──────────────────────────
-# Restart worker setelah melayani N requests → RAM kembali bersih
-max_requests = 150
-# Jitter supaya kedua worker tidak restart bersamaan (zero downtime)
-max_requests_jitter = 30
+# Restart worker setelah 80 request → RAM kembali bersih lebih cepat
+max_requests = 80
+# Jitter agar tidak restart tepat di angka yang sama setiap kali
+max_requests_jitter = 15
 
 # ── Timeouts ───────────────────────────────────────────────────────
-# Timeout per-request (detik). Agent LLM bisa lambat, kasih 3 menit.
-timeout = 180
-# Grace period saat worker di-recycle (beri waktu request selesai)
-graceful_timeout = 30
-# Keepalive untuk koneksi yang idle (cocok dengan Nginx upstream)
+# 2 menit cukup untuk LLM response lewat OpenRouter (bukan lokal)
+timeout = 120
+# Grace period saat worker di-recycle
+graceful_timeout = 20
+# Keepalive untuk koneksi idle (cocok dengan Nginx upstream)
 keepalive = 5
 
+# ── Request Size Limits ────────────────────────────────────────────
+# Cegah request line + header besar masuk RAM
+limit_request_line    = 4096   # default 8190, turunkan ke 4096
+limit_request_fields  = 50     # default 100
+limit_request_field_size = 8190
+
 # ── Heartbeat ──────────────────────────────────────────────────────
-# Pakai RAM-disk untuk heartbeat file (lebih cepat dari disk I/O)
+# Gunakan RAM-disk untuk heartbeat file (lebih cepat dari disk I/O)
 worker_tmp_dir = "/dev/shm"
 
 # ── Preloading ─────────────────────────────────────────────────────
@@ -50,23 +58,23 @@ preload_app = False
 
 # ── Logging ────────────────────────────────────────────────────────
 accesslog = "-"   # stdout
-errorlog = "-"    # stderr
-loglevel = "info"
+errorlog  = "-"   # stderr
+loglevel  = "info"
 
 # ── Server Hooks ───────────────────────────────────────────────────
 def worker_exit(server, worker):
     """Log ketika worker di-recycle (untuk monitoring memory leak fix)."""
     server.log.info(
-        "♻️  Worker %s (PID %s) recycled after max_requests. RAM freed.",
-        worker.pid, worker.pid
+        "♻️  Worker PID %s recycled after max_requests. RAM freed.",
+        worker.pid,
     )
 
 def on_starting(server):
     """Log saat Gunicorn mulai."""
     server.log.info(
-        "🚀 BulkBuddy Gunicorn starting with %d workers, "
-        "max_requests=%d (jitter=%d)",
+        "🚀 BulkBuddy Gunicorn starting — workers=%d max_requests=%d (jitter=%d) timeout=%ds",
         server.app.cfg.workers,
         server.app.cfg.max_requests,
         server.app.cfg.max_requests_jitter,
+        server.app.cfg.timeout,
     )

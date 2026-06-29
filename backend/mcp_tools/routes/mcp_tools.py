@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import os
+import threading
 
 from supabase import create_client, Client
 from dotenv import load_dotenv, find_dotenv
@@ -23,7 +24,6 @@ except ImportError:
     # Define a fallback if import fails
     def check_after_adding():
         print("Warning: check_after_adding function not available")
-from ..utils._check_tools_status import check_after_adding
 
 # Load environment variables
 load_dotenv(find_dotenv())
@@ -43,6 +43,9 @@ router = APIRouter(
 
 # Initialize the MCP manager
 manager = MCPProxyManager()
+
+# Cooldown flag: prevent spawning a new check thread while one is already running
+_check_running = threading.Event()
 
 # Response models
 class StandardResponse(BaseModel):
@@ -224,22 +227,27 @@ async def refresh_tools(force_refresh: bool = False):
         arr_dict_tools_cmd = tool_args_converter(active_tools)
         result = manager.update_tools(arr_dict_tools_cmd)
         
-        # Run an immediate check after updating tools in a non-blocking way
+        # Run an immediate check after updating tools — only if no check is already running
         try:
-            # Use a separate thread to avoid blocking the API response
-            def trigger_check():
-                try:
-                    check_after_adding()
-                    print("Immediate status check triggered after tool refresh")
-                except Exception as e:
-                    print(f"Error running immediate status check: {e}")
-            
-            import threading
-            check_thread = threading.Thread(target=trigger_check)
-            check_thread.daemon = True
-            check_thread.start()
+            if not _check_running.is_set():
+                _check_running.set()  # Mark as running
+
+                def trigger_check():
+                    try:
+                        check_after_adding()
+                        print("Immediate status check triggered after tool refresh")
+                    except Exception as e:
+                        print(f"Error running immediate status check: {e}")
+                    finally:
+                        _check_running.clear()  # Allow next check
+
+                check_thread = threading.Thread(target=trigger_check, daemon=True)
+                check_thread.start()
+            else:
+                print("Skipping status check: previous check still running")
         except Exception as e:
             print(f"Error scheduling immediate status check: {e}")
+            _check_running.clear()
             
         return StandardResponse(
             status="success",

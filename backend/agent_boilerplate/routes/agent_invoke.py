@@ -10,11 +10,6 @@ from typing import Dict, Any, Tuple, Optional
 from uuid import UUID
 from supabase import Client
 
-# Optional import for legacy gemma_model
-try:
-    from microservice.agent_backend.services import gemma_model
-except ImportError:
-    gemma_model = None
 
 from ..boilerplate.agent_boilerplate import agent_boilerplate
 from ..boilerplate.models import AgentInput
@@ -41,6 +36,116 @@ async def _maybe_handle_multimodal_and_augment(agent_input, max_new_tokens=None,
     """
     return agent_input, None
 
+async def verify_agent_access(
+    agent_id: str,
+    user_id: str,
+    supabase: Client,
+    agent_config_override: Optional[dict] = None,
+    allow_visitor: bool = False
+) -> Tuple[dict, str]:
+    """
+    Verifies if a user has access to an agent and returns (agent_config, access_level).
+    Raises HTTPException / Custom Errors if access is denied.
+    """
+    if agent_config_override:
+        print("Using agent_config from request")
+        agent_config = agent_config_override
+        if agent_config.get("agent_id") != agent_id:
+            raise BadRequestError(
+                f"agent_id in URL ({agent_id}) does not match agent_id in agent_config ({agent_config.get('agent_id')})",
+                additional_info={
+                    "url_agent_id": agent_id,
+                    "config_agent_id": agent_config.get("agent_id")
+                }
+            )
+    else:
+        print("Fetching agent_config from database")
+        try:
+            agent_response = (
+                supabase.table("agents")
+                .select("agent_id, agent_name, description, agent_style, on_status, company_id, user_id, tools, share_editor_with, share_visitor_with")
+                .eq("agent_id", agent_id)
+                .eq("on_status", True)
+                .execute()
+            )
+        except Exception as e:
+            raise InternalServerError(f"Error fetching agent: {str(e)}")
+            
+        if not agent_response.data:
+            raise NotFoundError(
+                f"Agent with ID '{agent_id}' not found",
+                additional_info={"agent_id": agent_id}
+            )
+            
+        agent_config = agent_response.data[0]
+        
+        # Fetch tool details if tools are present
+        if agent_config.get("tools"):
+            tool_details = []
+            for tool_id in agent_config.get("tools", []):
+                try:
+                    tool_response = (
+                        supabase.table("tools_with_decrypted_keys")
+                        .select("tool_id, name, description, versions")
+                        .eq("tool_id", tool_id)
+                        .execute()
+                    )
+                    if tool_response.data:
+                        tool_details.append(tool_response.data[0])
+                except Exception as e:
+                    print(f"Error fetching tool details for {tool_id}: {str(e)}")
+            agent_config["tool_details"] = tool_details
+
+    # Check access
+    has_access = False
+    access_level = "none"
+    
+    if agent_config.get("user_id") == user_id:
+        has_access = True
+        access_level = "owner"
+    elif agent_config.get("company_id"):
+        try:
+            user_company_response = (
+                supabase.table("user_companies")
+                .select("role_id")
+                .eq("user_id", user_id)
+                .eq("company_id", agent_config["company_id"])
+                .execute()
+            )
+            if user_company_response.data:
+                has_access = True
+                access_level = "company"
+        except Exception as e:
+            raise InternalServerError(f"Error checking company access: {str(e)}")
+            
+    if not has_access:
+        try:
+            user_response = (
+                supabase.table("users")
+                .select("email")
+                .eq("user_id", user_id)
+                .execute()
+            )
+        except Exception as e:
+            raise InternalServerError(f"Error fetching user email: {str(e)}")
+            
+        if user_response.data:
+            user_email = user_response.data[0].get("email")
+            if user_email in agent_config.get("share_editor_with", []):
+                has_access = True
+                access_level = "editor"
+            elif allow_visitor and user_email in agent_config.get("share_visitor_with", []):
+                has_access = True
+                access_level = "visitor"
+                
+    if not has_access:
+        raise ForbiddenError(
+            "You don't have access to this agent",
+            additional_info={"agent_id": agent_id}
+        )
+        
+    return agent_config, access_level
+
 
 @router.post("/{agent_id}/invoke", response_model=Dict[str, Any])
 async def invoke_agent(
@@ -60,158 +165,13 @@ async def invoke_agent(
         # Get user_id from request state (set by middleware)
         user_id = request.state.user_id
         
-        # Check if agent_config is provided in the request
-        if agent_input.agent_config:
-            print("Using agent_config from request")
-            agent_config = agent_input.agent_config
-            
-            # Verify that the agent_id matches
-            if agent_config.get("agent_id") != agent_id:
-                raise BadRequestError(
-                    f"agent_id in URL ({agent_id}) does not match agent_id in agent_config ({agent_config.get('agent_id')})",
-                    additional_info={
-                        "url_agent_id": agent_id,
-                        "config_agent_id": agent_config.get("agent_id")
-                    }
-                )
-            
-            # Check if the user has access to the agent
-            has_access = False
-            
-            # Check if the user is the owner of the agent
-            if agent_config.get("user_id") == user_id:
-                has_access = True
-            # Check if the agent belongs to a company the user has access to
-            elif agent_config.get("company_id"):
-                try:
-                    user_company_response = (
-                        supabase.table("user_companies")
-                        .select("role_id")
-                        .eq("user_id", user_id)
-                        .eq("company_id", agent_config["company_id"])
-                        .execute()
-                    )
-                    if user_company_response.data:
-                        has_access = True
-                except Exception as e:
-                    raise InternalServerError(f"Error checking company access: {str(e)}")
-            
-            # If no access yet, check if the user's email has editor access
-            if not has_access:
-                # Get the user's email
-                try:
-                    user_response = (
-                        supabase.table("users")
-                        .select("email")
-                        .eq("user_id", user_id)
-                        .execute()
-                    )
-                except Exception as e:
-                    raise InternalServerError(f"Error fetching user email: {str(e)}")
-                
-                if user_response.data:
-                    user_email = user_response.data[0].get("email")
-                    # Check if the email is in the share_editor_with list
-                    if user_email in agent_config.get("share_editor_with", []):
-                        has_access = True
-            
-            # If still no access, deny permission
-            if not has_access:
-                raise ForbiddenError(
-                    "You don't have access to this agent",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
-        else:
-            print("Fetching agent_config from database")
-            # Get agent by agent_id
-            try:
-                agent_response = (
-                    supabase.table("agents")
-                    .select("agent_id, agent_name, description, agent_style, on_status, company_id, user_id, tools, share_editor_with")
-                    .eq("agent_id", agent_id)
-                    .eq("on_status", True)
-                    .execute()
-                )
-            except Exception as e:
-                raise InternalServerError(f"Error fetching agent: {str(e)}")
-            
-            if not agent_response.data:
-                raise NotFoundError(
-                    f"Agent with ID '{agent_id}' not found",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
-            
-            agent_config = agent_response.data[0]
-            
-            # Fetch tool details if tools are present
-            if agent_config.get("tools"):
-                tool_details = []
-                for tool_id in agent_config.get("tools", []):
-                    try:
-                        tool_response = (
-                            supabase.table("tools_with_decrypted_keys")
-                            .select("tool_id, name, description, versions")
-                            .eq("tool_id", tool_id)
-                            .execute()
-                        )
-                        if tool_response.data:
-                            tool_details.append(tool_response.data[0])
-                    except Exception as e:
-                        print(f"Error fetching tool details for {tool_id}: {str(e)}")
-                agent_config["tool_details"] = tool_details
-            
-            # Check if the user has access to the agent
-            has_access = False
-            
-            # Check if the user is the owner of the agent
-            if agent_config.get("user_id") == user_id:
-                has_access = True
-            # Check if the agent belongs to a company the user has access to
-            elif agent_config.get("company_id"):
-                try:
-                    user_company_response = (
-                        supabase.table("user_companies")
-                        .select("role_id")
-                        .eq("user_id", user_id)
-                        .eq("company_id", agent_config["company_id"])
-                        .execute()
-                    )
-                    if user_company_response.data:
-                        has_access = True
-                except Exception as e:
-                    raise InternalServerError(f"Error checking company access: {str(e)}")
-            
-            # If no access yet, check if the user's email has editor access
-            if not has_access:
-                # Get the user's email
-                try:
-                    user_response = (
-                        supabase.table("users")
-                        .select("email")
-                        .eq("user_id", user_id)
-                        .execute()
-                    )
-                except Exception as e:
-                    raise InternalServerError(f"Error fetching user email: {str(e)}")
-                
-                if user_response.data:
-                    user_email = user_response.data[0].get("email")
-                    # Check if the email is in the share_editor_with list
-                    if user_email in agent_config.get("share_editor_with", []):
-                        has_access = True
-            
-            # If still no access, deny permission
-            if not has_access:
-                raise ForbiddenError(
-                    "You don't have access to this agent",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
+        agent_config, _ = await verify_agent_access(
+            agent_id=agent_id,
+            user_id=user_id,
+            supabase=supabase,
+            agent_config_override=agent_input.agent_config,
+            allow_visitor=False
+        )
         
         # Invoke the agent
         try:
@@ -258,158 +218,13 @@ async def invoke_agent_stream(
         # Get user_id from request state (set by middleware)
         user_id = request.state.user_id
         
-        # Check if agent_config is provided in the request
-        if agent_input.agent_config:
-            print("Using agent_config from request")
-            agent_config = agent_input.agent_config
-            
-            # Verify that the agent_id matches
-            if agent_config.get("agent_id") != agent_id:
-                raise BadRequestError(
-                    f"agent_id in URL ({agent_id}) does not match agent_id in agent_config ({agent_config.get('agent_id')})",
-                    additional_info={
-                        "url_agent_id": agent_id,
-                        "config_agent_id": agent_config.get("agent_id")
-                    }
-                )
-            
-            # Check if the user has access to the agent
-            has_access = False
-            
-            # Check if the user is the owner of the agent
-            if agent_config.get("user_id") == user_id:
-                has_access = True
-            # Check if the agent belongs to a company the user has access to
-            elif agent_config.get("company_id"):
-                try:
-                    user_company_response = (
-                        supabase.table("user_companies")
-                        .select("role_id")
-                        .eq("user_id", user_id)
-                        .eq("company_id", agent_config["company_id"])
-                        .execute()
-                    )
-                    if user_company_response.data:
-                        has_access = True
-                except Exception as e:
-                    raise InternalServerError(f"Error checking company access: {str(e)}")
-            
-            # If no access yet, check if the user's email has editor access
-            if not has_access:
-                # Get the user's email
-                try:
-                    user_response = (
-                        supabase.table("users")
-                        .select("email")
-                        .eq("user_id", user_id)
-                        .execute()
-                    )
-                except Exception as e:
-                    raise InternalServerError(f"Error fetching user email: {str(e)}")
-                
-                if user_response.data:
-                    user_email = user_response.data[0].get("email")
-                    # Check if the email is in the share_editor_with list
-                    if user_email in agent_config.get("share_editor_with", []):
-                        has_access = True
-            
-            # If still no access, deny permission
-            if not has_access:
-                raise ForbiddenError(
-                    "You don't have access to this agent",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
-        else:
-            print("Fetching agent_config from database")
-            # Get agent by agent_id
-            try:
-                agent_response = (
-                    supabase.table("agents")
-                    .select("agent_id, agent_name, description, agent_style, on_status, company_id, user_id, tools, share_editor_with")
-                    .eq("agent_id", agent_id)
-                    .eq("on_status", True)
-                    .execute()
-                )
-            except Exception as e:
-                raise InternalServerError(f"Error fetching agent: {str(e)}")
-            
-            if not agent_response.data:
-                raise NotFoundError(
-                    f"Agent with ID '{agent_id}' not found",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
-            
-            agent_config = agent_response.data[0]
-            
-            # Fetch tool details if tools are present
-            if agent_config.get("tools"):
-                tool_details = []
-                for tool_id in agent_config.get("tools", []):
-                    try:
-                        tool_response = (
-                            supabase.table("tools_with_decrypted_keys")
-                            .select("tool_id, name, description, versions")
-                            .eq("tool_id", tool_id)
-                            .execute()
-                        )
-                        if tool_response.data:
-                            tool_details.append(tool_response.data[0])
-                    except Exception as e:
-                        print(f"Error fetching tool details for {tool_id}: {str(e)}")
-                agent_config["tool_details"] = tool_details
-            
-            # Check if the user has access to the agent
-            has_access = False
-            
-            # Check if the user is the owner of the agent
-            if agent_config.get("user_id") == user_id:
-                has_access = True
-            # Check if the agent belongs to a company the user has access to
-            elif agent_config.get("company_id"):
-                try:
-                    user_company_response = (
-                        supabase.table("user_companies")
-                        .select("role_id")
-                        .eq("user_id", user_id)
-                        .eq("company_id", agent_config["company_id"])
-                        .execute()
-                    )
-                    if user_company_response.data:
-                        has_access = True
-                except Exception as e:
-                    raise InternalServerError(f"Error checking company access: {str(e)}")
-            
-            # If no access yet, check if the user's email has editor access
-            if not has_access:
-                # Get the user's email
-                try:
-                    user_response = (
-                        supabase.table("users")
-                        .select("email")
-                        .eq("user_id", user_id)
-                        .execute()
-                    )
-                except Exception as e:
-                    raise InternalServerError(f"Error fetching user email: {str(e)}")
-                
-                if user_response.data:
-                    user_email = user_response.data[0].get("email")
-                    # Check if the email is in the share_editor_with list
-                    if user_email in agent_config.get("share_editor_with", []):
-                        has_access = True
-            
-            # If still no access, deny permission
-            if not has_access:
-                raise ForbiddenError(
-                    "You don't have access to this agent",
-                    additional_info={
-                        "agent_id": agent_id
-                    }
-                )
+        agent_config, _ = await verify_agent_access(
+            agent_id=agent_id,
+            user_id=user_id,
+            supabase=supabase,
+            agent_config_override=agent_input.agent_config,
+            allow_visitor=False
+        )
         
         # Invoke the agent (streaming)
         # If multimodal: generate caption first then stream the regular pipeline
@@ -515,84 +330,12 @@ async def get_agent_info(
         # Get user_id from request state (set by middleware)
         user_id = request.state.user_id
         
-        # Get agent by agent_id
-        try:
-            agent_response = (
-                supabase.table("agents")
-                .select("agent_id, agent_name, description, agent_style, on_status, company_id, user_id, tools, share_editor_with, share_visitor_with")
-                .eq("agent_id", agent_id)
-                .eq("on_status", True)
-                .execute()
-            )
-        except Exception as e:
-            raise InternalServerError(f"Error fetching agent: {str(e)}")
-        
-        if not agent_response.data:
-            raise NotFoundError(
-                f"Agent with ID '{agent_id}' not found",
-                additional_info={
-                    "agent_id": agent_id
-                }
-            )
-        
-        agent_config = agent_response.data[0]
-        
-        # Check if the user has access to the agent
-        has_access = False
-        access_level = "none"
-        
-        # Check if the user is the owner of the agent
-        if agent_config.get("user_id") == user_id:
-            has_access = True
-            access_level = "owner"
-        # Check if the agent belongs to a company the user has access to
-        elif agent_config.get("company_id"):
-            try:
-                user_company_response = (
-                    supabase.table("user_companies")
-                    .select("role_id")
-                    .eq("user_id", user_id)
-                    .eq("company_id", agent_config["company_id"])
-                    .execute()
-                )
-                if user_company_response.data:
-                    has_access = True
-                    access_level = "company"
-            except Exception as e:
-                raise InternalServerError(f"Error checking company access: {str(e)}")
-        
-        # If no access yet, check if the user's email has editor or visitor access
-        if not has_access:
-            # Get the user's email
-            try:
-                user_response = (
-                    supabase.table("users")
-                    .select("email")
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-            except Exception as e:
-                raise InternalServerError(f"Error fetching user email: {str(e)}")
-            
-            if user_response.data:
-                user_email = user_response.data[0].get("email")
-                # Check if the email is in the share_editor_with list
-                if user_email in agent_config.get("share_editor_with", []):
-                    has_access = True
-                    access_level = "editor"
-                # Check if the email is in the share_visitor_with list
-                elif user_email in agent_config.get("share_visitor_with", []):
-                    has_access = True
-                    access_level = "visitor"
-        
-        # If still no access, deny permission
-        if not has_access:
-            raise ForbiddenError(
-                "You don't have access to this agent",
-                additional_info={
-                    "agent_id": agent_id
-                }
-            )
+        agent_config, access_level = await verify_agent_access(
+            agent_id=agent_id,
+            user_id=user_id,
+            supabase=supabase,
+            allow_visitor=True
+        )
         
         # Return basic information about the agent
         return {

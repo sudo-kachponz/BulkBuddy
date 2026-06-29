@@ -58,6 +58,7 @@ export default function InputBar({ onSend, disabled }) {
 
   return (
     <div className="shrink-0 border-t border-slate-200/70 bg-white/80 backdrop-blur-md px-4 py-3"
+      style={{ paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))' }}
       onDragOver={e => e.preventDefault()} onDrop={handleDrop}>
       {/* Image previews strip */}
       {files.length > 0 && (

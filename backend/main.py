@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from starlette.middleware.base import BaseHTTPMiddleware
+import jwt
 
 # Ensure backend folder is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -53,13 +54,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class MockAuthMiddleware(BaseHTTPMiddleware):
+class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # We hardcode the user_id matching the one used in seed_mcp.py
-        request.state.user_id = "12b673cf-c6a3-4d80-afc4-30b6566b3690"
+        # Exclude CORS preflight, docs, and debug endpoints from auth checks
+        if request.method == "OPTIONS" or request.url.path in ["/", "/health", "/docs", "/openapi.json", "/redoc", "/debug/memory", "/debug/gc"]:
+            return await call_next(request)
+            
+        auth_header = request.headers.get("Authorization")
+        api_key_header = request.headers.get("X-API-Key")
+        
+        user_id = None
+        
+        # 1. API Key Check
+        api_key_env = os.environ.get("BULKBUDDY_API_KEY")
+        if api_key_env and api_key_header == api_key_env:
+            user_id = "12b673cf-c6a3-4d80-afc4-30b6566b3690"
+            
+        # 2. Supabase JWT Check
+        elif auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            jwt_secret = os.environ.get("JWT_SECRET")
+            if jwt_secret:
+                try:
+                    payload = jwt.decode(token, jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
+                    user_id = payload.get("sub")
+                except Exception as e:
+                    logger.warning(f"Failed to decode JWT: {e}")
+                    
+        # 3. Development Fallback
+        if not user_id:
+            env = os.environ.get("ENV", "development")
+            if env == "development":
+                user_id = "12b673cf-c6a3-4d80-afc4-30b6566b3690"
+            else:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized: Missing or invalid authentication"})
+                
+        request.state.user_id = user_id
         return await call_next(request)
 
-app.add_middleware(MockAuthMiddleware)
+app.add_middleware(AuthMiddleware)
 
 def setup_google_credentials():
     import json
@@ -103,9 +137,12 @@ def setup_google_credentials():
 
 @app.on_event("startup")
 async def startup_event():
-    # Start tracemalloc for memory debugging (low overhead, ~5% CPU)
-    tracemalloc.start(10)  # Track top 10 frames
-    logger.info("🧠 tracemalloc started for memory monitoring")
+    # Start tracemalloc for memory debugging only in development
+    if os.environ.get("ENV", "development") == "development":
+        tracemalloc.start(10)  # Track top 10 frames
+        logger.info("🧠 tracemalloc started for memory monitoring")
+    else:
+        logger.info("🧠 tracemalloc disabled in production to save RAM")
 
     # Make supabase available in app.state for the routers
     app.state.supabase = supabase_client
@@ -163,6 +200,12 @@ app.include_router(chat_history_router)
 @app.get("/")
 def read_root():
     return {"message": "BulkBuddy Backend is up and running!"}
+
+
+@app.get("/health")
+def health_check():
+    """Lightweight liveness probe — no auth, no DB call."""
+    return {"ok": True}
 
 
 @app.get("/debug/memory")
@@ -237,7 +280,17 @@ async def debug_memory():
     except Exception as e:
         result["agent_memories"] = f"Error: {e}"
     
-    # 5. GC stats
+    # 5. MCP proxy process count
+    try:
+        from mcp_tools.routes.mcp_tools import manager as mcp_manager
+        result["mcp_processes"] = {
+            "count": len(mcp_manager._processes),
+            "ports": list(mcp_manager._processes.keys()),
+        }
+    except Exception as e:
+        result["mcp_processes"] = f"Error: {e}"
+
+    # 6. GC stats
     result["gc_stats"] = {
         f"gen{i}": gc.get_count()[i] for i in range(3)
     }

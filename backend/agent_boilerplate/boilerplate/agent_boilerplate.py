@@ -44,7 +44,9 @@ class AgentBoilerplate:
     
     # Maximum number of agent memories to keep in RAM.
     # Oldest entries are evicted when this limit is exceeded.
-    MAX_AGENT_MEMORIES = 20
+    # VPS 2.12 GB: keep low — each MemorySaver holds the full LangGraph
+    # conversation graph (all messages + intermediate tool-call states).
+    MAX_AGENT_MEMORIES = 5
 
     def __init__(self):
         """
@@ -91,6 +93,15 @@ class AgentBoilerplate:
                 evicted_id, evicted_mem = self.agent_memories.popitem(last=False)
                 logger.info("♻️  Evicted agent memory for %s (capacity: %d)", evicted_id, self.MAX_AGENT_MEMORIES)
                 del evicted_mem
+            # Schedule GC outside the hot path — don't block the async loop
+            import asyncio as _asyncio
+            try:
+                loop = _asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.call_later(1.0, gc.collect)
+                else:
+                    gc.collect()
+            except RuntimeError:
                 gc.collect()
             self.agent_memories[agent_id] = MemorySaver()
         return self.agent_memories[agent_id]
@@ -271,13 +282,17 @@ class AgentBoilerplate:
             print("--- Logging Failed: SUPABASE_URL or SUPABASE_KEY environment variables not set. ---", file=sys.stderr)
             return
 
+        # Truncate chat_history to last 50 messages per thread to cap Supabase payload size
+        _MAX_MESSAGES_PER_THREAD = 50
+        chat_history_payload = chat_history_payload[-_MAX_MESSAGES_PER_THREAD:]
+
         print(f"--- Logging interaction via shared Supabase client ---")
         try:
             
             # First, check if there's an existing log for this agent_id
             existing_log_response = (
                 supabase.table("agent_logs")
-                .select("*")
+                .select("agent_log_id, chat_history, input_token, output_token, embedding_token, pricing")
                 .eq("agent_id", str(agent_id))
                 .execute()
             )

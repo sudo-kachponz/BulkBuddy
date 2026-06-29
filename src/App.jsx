@@ -4,7 +4,6 @@ import ChatArea from './components/ChatArea'
 import InputBar from './components/InputBar'
 import InteractiveTutorial from './components/InteractiveTutorial'
 import { MOCK_NASABAH, QUICK_ACTIONS } from './data/mockData'
-import mandiriLogo from './assets/bankmandiri_light.png'
 import mailIcon from './assets/mail.svg'
 import sheetIcon from './assets/sheet.svg'
 import { toSheetRow, createEmptyNasabah } from './data/schema'
@@ -22,9 +21,9 @@ function Toast({ toast, onClose }) {
     warning: 'from-amber-500 to-orange-500',
   }
   return (
-    <div className={`fixed top-[calc(env(safe-area-inset-top,0px)+56px)] md:top-20 left-4 right-4 md:left-auto md:right-5 md:max-w-md z-[150] flex items-center justify-between gap-2 px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter break-words leading-snug`}>
+    <div className={`fixed bottom-4 md:bottom-auto md:top-20 left-4 right-4 md:left-auto md:right-5 md:max-w-md z-[150] flex items-center justify-between gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium text-white bg-gradient-to-r ${colors[toast.type] || colors.info} msg-enter break-words leading-snug`}>
       <span className="flex-1 min-w-0 break-words">{toast.msg}</span>
-      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80 shrink-0 leading-none">✕</button>
+      <button onClick={onClose} className="ml-2 hover:opacity-70 cursor-pointer text-white/80 shrink-0 p-1 leading-none rounded-full bg-white/10 hover:bg-white/20 transition-colors">✕</button>
     </div>
   )
 }
@@ -774,11 +773,7 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
         {/* Top bar */}
         <div className="relative flex flex-col md:flex-row md:items-center justify-between px-4 md:px-6 py-3 border-b-4 border-[#1AC1DD] bg-white/80 backdrop-blur-md gap-2 md:gap-0" style={{ paddingTop: 'max(12px, calc(env(safe-area-inset-top, 0px) + 12px))' }}>
           
-          {/* Mandiri Logo — absolute inside Top bar so it moves with the panel */}
-          <div className={`absolute top-2.5 right-4 md:right-5 z-50 pointer-events-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
-            <img src={mandiriLogo} alt="Bank Mandiri" className="h-6 md:h-8 object-contain" />
-          </div>
-          <div className={`pr-20 md:pr-0 max-w-[85%] md:max-w-none transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
+          <div className={`transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <h1 className="text-[12px] md:text-sm font-bold text-[#344054] leading-snug md:leading-normal">
               <span className="md:hidden">Asisten AI Pembuka Rekening</span>
               <span className="hidden md:inline">AUTOMASI APLIKASI PEMBUKAAN REKENING PRODUK DANA PERORANGAN</span>
@@ -787,7 +782,7 @@ Pastikan kamu mengganti <URL_ASLI_DARI_FILE_DUPLIKAT> dengan URL yang sebenarnya
               PERSONAL ACCOUNT OPENING APPLICATION FORM AUTOMATION
             </p>
           </div>
-          <div className={`flex items-center md:mr-32 self-start md:self-auto transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
+          <div className={`flex items-center self-start md:self-auto transition-opacity duration-200 ${!sidebarCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
             <div className="flex items-center gap-1.5 px-3 py-1 md:py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-[10px] md:text-[11px] font-semibold text-emerald-600">Online</span>

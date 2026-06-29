@@ -2,7 +2,6 @@ from supabase import create_client, Client
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 
-import schedule
 import psutil
 import time
 import supabase
@@ -43,9 +42,7 @@ _cache_ttl = 60  # Cache TTL in seconds
 _tool_restart_attempts = {}  # tool_id -> last_attempt_time
 _restart_cooldown = 15 * 60  # 15 minutes in seconds
 
-# Track tool restart attempts to avoid frequent restarts
-_tool_restart_attempts = {}  # tool_id -> last_attempt_time
-_restart_cooldown = 15 * 60  # 15 minutes in seconds
+
 
 # Fetch all tools information from Supabase with caching
 def get_tools_info():
@@ -144,98 +141,55 @@ def start_tool(tool):
     def run_tool_start():
         try:
             if 'versions' not in tool or not tool['versions']:
-                logger.warning(f"Cannot start tool: no versions found for tool {tool.get('name', 'unknown')}")
+                logger.warning("Cannot start tool: no versions found for tool %s", tool.get('name', 'unknown'))
                 return
-                
+
             version = tool['versions'][0]
             if 'released' not in version or not version['released']:
-                logger.warning(f"Cannot start tool: no released version found for tool {tool.get('name', 'unknown')}")
+                logger.warning("Cannot start tool: no released version for tool %s", tool.get('name', 'unknown'))
                 return
-                
+
             released = version['released']
             port = released.get('port', '')
             args = released.get('args', '')
             env = released.get('env', {})
-            
+
             if not port or not args:
-                logger.warning(f"Cannot start tool: missing port or args for tool {tool.get('name', 'unknown')}")
+                logger.warning("Cannot start tool: missing port or args for tool %s", tool.get('name', 'unknown'))
                 return
-                
-            # Convert env dict to command line args
-            env_str = " ".join(f"-e {k} {v}" for k, v in env.items())
-            if env_str:
-                env_str += " "
-                
-            # Construct the full command
+
+            # Build env flags and full command
+            env_str = (" ".join(f"-e {k} {v}" for k, v in env.items()) + " ") if env else ""
             cmd = f"mcp-proxy --sse-port={port} {env_str}-- {args}".replace("  ", " ")
-            
-            logger.info(f"Starting tool '{tool.get('name', 'unknown')}' with command: {cmd}")
-            
-            # Start the process
+
+            logger.info("Starting tool '%s' with command: %s", tool.get('name', 'unknown'), cmd)
+
             import subprocess
-            import os
-            
+            import shlex
+
             env_vars = os.environ.copy()
-            process = subprocess.Popen(
-                cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=env_vars
+            bun_path = os.path.abspath(os.path.expanduser("~/.bun/bin"))
+            if bun_path not in env_vars.get("PATH", ""):
+                env_vars["PATH"] = bun_path + os.pathsep + env_vars.get("PATH", "")
+
+            # Use DEVNULL — no pipe buffers, no reader threads needed
+            subprocess.Popen(
+                shlex.split(cmd),
+                shell=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env_vars,
             )
-            
-            # Start a thread to read output
-            def read_output():
-                import re
-                import copy
-                for line in iter(process.stdout.readline, ''):
-                    if line:
-                        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                        clean_line = line.strip()
-                        logger.info(f"[{timestamp}][Tool {tool.get('name', 'unknown')}] {clean_line}")
-                        
-                        # Catch dynamic Uvicorn port
-                        match = re.search(r"Uvicorn running on http://(?:127\.0\.0\.1|localhost|0\.0\.0\.0):(\d+)", clean_line)
-                        if match:
-                            dynamic_port = match.group(1)
-                            logger.info(f"Caught dynamic port {dynamic_port} for tool '{tool.get('name', 'unknown')}'")
-                            
-                            if 'versions' in tool and tool['versions']:
-                                versions_copy = copy.deepcopy(tool['versions'])
-                                if 'released' in versions_copy[0]:
-                                    versions_copy[0]['released']['port'] = str(dynamic_port)
-                                    # Update the in-memory tool reference to prevent race condition with check_tools_status batch update
-                                    tool['versions'][0]['released']['port'] = str(dynamic_port)
-                                    
-                                    try:
-                                        supabase.table('tools').update({
-                                            "versions": versions_copy,
-                                            "on_status": "Online"
-                                        }).eq("tool_id", tool.get('tool_id')).execute()
-                                        logger.info(f"Updated database with dynamic port {dynamic_port} for tool {tool.get('tool_id')}")
-                                    except Exception as db_e:
-                                        logger.error(f"Failed to update dynamic port in database: {db_e}")
-            
-            import threading
-            output_thread = threading.Thread(target=read_output)
-            output_thread.daemon = True
-            output_thread.start()
-            
-            logger.info(f"Tool '{tool.get('name', 'unknown')}' started successfully")
-            
+
+            logger.info("Tool '%s' started successfully", tool.get('name', 'unknown'))
+
         except Exception as e:
-            logger.error(f"Error starting tool '{tool.get('name', 'unknown')}': {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-    
-    # Start the tool in a separate thread
+            logger.error("Error starting tool '%s': %s", tool.get('name', 'unknown'), e, exc_info=True)
+
     import threading
-    tool_thread = threading.Thread(target=run_tool_start)
-    tool_thread.daemon = True
+    tool_thread = threading.Thread(target=run_tool_start, daemon=True)
     tool_thread.start()
-    
+
     return True  # Return immediately, actual start happens in background
 
 # Main function to check the status of each tool
@@ -365,9 +319,6 @@ def check_tools_status():
         for tool in tools_to_start:
             start_tool(tool)
 
-
-# Schedule status check to run every 1 minute
-schedule.every(1).minutes.do(check_tools_status)
 
 # Also schedule an immediate check after adding a new tool
 def check_after_adding():
